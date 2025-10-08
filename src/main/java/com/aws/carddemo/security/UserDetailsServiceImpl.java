@@ -317,7 +317,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
             .username(user.getUsername())
             .password(user.getPasswordHash())  // BCrypt hash, not plain-text
             .authorities(getAuthorities(user))  // Convert userType to Spring Security roles
-            .accountLocked(user.getAccountLocked())  // Account lockout status
+            .accountLocked(Boolean.TRUE.equals(user.getAccountLocked()))  // Safe null handling: null → false (unlocked)
             .accountExpired(false)  // Account expiration not implemented (future enhancement)
             .credentialsExpired(false)  // Password expiration not implemented (future enhancement)
             .disabled(false)  // User disable flag not implemented (future enhancement)
