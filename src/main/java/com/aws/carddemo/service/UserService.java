@@ -35,7 +35,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.regex.Pattern;
 
 /**
@@ -235,10 +234,6 @@ public class UserService {
         String hashedPassword = passwordEncoder.encode(request.getPassword());
         user.setPasswordHash(hashedPassword);
 
-        // Set audit timestamps
-        user.setCreatedAt(LocalDateTime.now());
-        user.setUpdatedAt(LocalDateTime.now());
-
         // Initialize security fields
         user.setAccountLocked(false);
         user.setFailedLoginAttempts(0);
@@ -328,9 +323,6 @@ public class UserService {
             log.info("No modifications detected for user: {}", user.getUsername());
             throw new InvalidInputException("No changes detected. Please modify at least one field to update.");
         }
-
-        // Update audit timestamp
-        user.setUpdatedAt(LocalDateTime.now());
 
         // Persist changes (replaces COBOL REWRITE)
         User updatedUser = userRepository.save(user);
