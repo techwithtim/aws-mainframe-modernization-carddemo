@@ -126,6 +126,28 @@
             <version>${caffeine.version}</version>
         </dependency>
         
+        <!-- Hibernate JCache - Second-level cache support for Hibernate ORM -->
+        <dependency>
+            <groupId>org.hibernate.orm</groupId>
+            <artifactId>hibernate-jcache</artifactId>
+            <version>6.5.2.Final</version>
+        </dependency>
+        
+        <!-- JCache API (JSR-107) - Java Caching API specification -->
+        <dependency>
+            <groupId>javax.cache</groupId>
+            <artifactId>cache-api</artifactId>
+            <version>1.1.1</version>
+        </dependency>
+        
+        <!-- Caffeine JCache - JCache (JSR-107) provider implementation using Caffeine -->
+        <!-- Provides JCacheRegionFactory support for Hibernate second-level cache -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>jcache</artifactId>
+            <version>${caffeine.version}</version>
+        </dependency>
+        
         <!-- ===================================================================
              DATABASE & ORM
              PostgreSQL driver, connection pooling, and database migrations
