@@ -1,0 +1,287 @@
+# Kubernetes Ingress resource for CardDemo modernized application
+# Migrated from: CICS Transaction Server external access (mainframe)
+# Purpose: Layer 7 HTTP/HTTPS routing for REST API endpoints with AWS ALB integration
+#
+# This Ingress provides:
+# - AWS Application Load Balancer (ALB) integration via ingress controller
+# - TLS termination with SSL certificate for HTTPS enforcement (PCI-DSS Requirement 4.1)
+# - Path-based routing for /api/v1/* REST API endpoints
+# - Hostname-based virtual hosting for production domain
+# - SSL redirect policy (HTTP → HTTPS) for secure communications
+# - Integration with AWS Certificate Manager (ACM) for automated certificate management
+#
+# Security Compliance:
+# - PCI-DSS Requirement 4.1: Encryption in transit via TLS 1.3
+# - Agent Action Plan section 0.8.1: Container-First Deployment
+# - Technical Specification 5.1: Ingress configuration requirements
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: carddemo-ingress
+  namespace: carddemo
+  annotations:
+    # AWS ALB Ingress Controller annotations
+    kubernetes.io/ingress.class: alb
+    
+    # ALB scheme: internet-facing for external access
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    
+    # Target type: ip (route directly to pod IPs for better performance)
+    alb.ingress.kubernetes.io/target-type: ip
+    
+    # SSL redirect: Force HTTPS for all requests (PCI-DSS compliance)
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    
+    # Listen on both HTTP and HTTPS ports
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    
+    # SSL policy: Use AWS recommended TLS 1.2+ policy (PCI-DSS Requirement 4.1)
+    # For stricter TLS 1.3 only, use: ELBSecurityPolicy-TLS13-1-2-2021-06
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS-1-2-2017-01
+    
+    # Certificate ARN: Replace with actual ACM certificate ARN in production
+    # Example: arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012
+    # alb.ingress.kubernetes.io/certificate-arn: ${ACM_CERTIFICATE_ARN}
+    
+    # Health check configuration
+    alb.ingress.kubernetes.io/healthcheck-path: /actuator/health
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '30'
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
+    alb.ingress.kubernetes.io/healthy-threshold-count: '2'
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: '3'
+    
+    # Success codes for health checks
+    alb.ingress.kubernetes.io/success-codes: '200'
+    
+    # Backend protocol: HTTP (ALB terminates TLS, backend uses HTTP)
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
+    
+    # Load balancer attributes
+    alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=60
+    
+    # Tags for AWS resource management
+    alb.ingress.kubernetes.io/tags: Environment=production,Application=carddemo,MigratedFrom=COBOL-CICS
+    
+  labels:
+    app: carddemo
+    component: ingress
+    migrated-from: cics-transaction-server
+
+spec:
+  # TLS configuration for HTTPS termination
+  tls:
+    - hosts:
+        # Production hostname (replace with actual domain in production)
+        - carddemo.example.com
+        # Alternative: Use AWS ALB auto-generated DNS name
+        # - *.elb.amazonaws.com
+      # Secret name containing TLS certificate (optional if using ACM certificate ARN)
+      # If using ACM via annotation, this field can be omitted
+      # secretName: carddemo-tls-cert
+  
+  # Routing rules for REST API endpoints
+  rules:
+    # Rule 1: Production hostname-based routing
+    - host: carddemo.example.com
+      http:
+        paths:
+          # Path 1: Authentication endpoints
+          # POST /api/v1/auth/login (from COSGN00.bms)
+          # POST /api/v1/auth/logout
+          - path: /api/v1/auth
+            pathType: Prefix
+            backend:
+              service:
+                name: carddemo-service
+                port:
+                  number: 80
+          
+          # Path 2: Account management endpoints
+          # GET /api/v1/accounts/{id} (from COACTVW.bms)
+          # PUT /api/v1/accounts/{id} (from COACTUP.bms)
+          # GET /api/v1/accounts/{id}/cards
+          # GET /api/v1/accounts/{id}/transactions
+          # POST /api/v1/accounts/{id}/payments (from COBIL00.bms)
+          - path: /api/v1/accounts
+            pathType: Prefix
+            backend:
+              service:
+                name: carddemo-service
+                port:
+                  number: 80
+          
+          # Path 3: Card management endpoints
+          # GET /api/v1/cards (from COCRDLI.bms)
+          # GET /api/v1/cards/{cardNumber} (from COCRDSL.bms)
+          # PUT /api/v1/cards/{id} (from COCRDUP.bms)
+          - path: /api/v1/cards
+            pathType: Prefix
+            backend:
+              service:
+                name: carddemo-service
+                port:
+                  number: 80
+          
+          # Path 4: Transaction management endpoints
+          # GET /api/v1/transactions (from COTRN00.bms)
+          # GET /api/v1/transactions/{id} (from COTRN01.bms)
+          # POST /api/v1/transactions (from COTRN02.bms)
+          - path: /api/v1/transactions
+            pathType: Prefix
+            backend:
+              service:
+                name: carddemo-service
+                port:
+                  number: 80
+          
+          # Path 5: Menu endpoints
+          # GET /api/v1/menu (from COMEN01.bms)
+          - path: /api/v1/menu
+            pathType: Prefix
+            backend:
+              service:
+                name: carddemo-service
+                port:
+                  number: 80
+          
+          # Path 6: Admin endpoints (user management)
+          # GET /api/v1/admin/menu (from COADM01.bms)
+          # GET /api/v1/admin/users (from COUSR00.bms)
+          # POST /api/v1/admin/users (from COUSR01.bms)
+          # PUT /api/v1/admin/users/{id} (from COUSR02.bms)
+          # DELETE /api/v1/admin/users/{id} (from COUSR03.bms)
+          - path: /api/v1/admin
+            pathType: Prefix
+            backend:
+              service:
+                name: carddemo-service
+                port:
+                  number: 80
+          
+          # Path 7: Report endpoints
+          # GET /api/v1/reports (from CORPT00.bms)
+          - path: /api/v1/reports
+            pathType: Prefix
+            backend:
+              service:
+                name: carddemo-service
+                port:
+                  number: 80
+          
+          # Path 8: Actuator health and metrics endpoints
+          # GET /actuator/health (liveness/readiness probes)
+          # GET /actuator/prometheus (Prometheus metrics export)
+          # GET /actuator/info
+          - path: /actuator
+            pathType: Prefix
+            backend:
+              service:
+                name: carddemo-service
+                port:
+                  number: 80
+          
+          # Path 9: Root path and API documentation
+          # GET / (application root)
+          # GET /swagger-ui.html (OpenAPI documentation)
+          # GET /v3/api-docs (OpenAPI JSON specification)
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: carddemo-service
+                port:
+                  number: 80
+
+---
+# Alternative Ingress configuration for development/staging environments
+# Uncomment and customize for non-production environments
+
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: carddemo-ingress-dev
+#   namespace: carddemo
+#   annotations:
+#     kubernetes.io/ingress.class: alb
+#     alb.ingress.kubernetes.io/scheme: internet-facing
+#     alb.ingress.kubernetes.io/target-type: ip
+#     alb.ingress.kubernetes.io/ssl-redirect: '443'
+#     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+#     alb.ingress.kubernetes.io/healthcheck-path: /actuator/health
+#     alb.ingress.kubernetes.io/backend-protocol: HTTP
+#     alb.ingress.kubernetes.io/tags: Environment=development,Application=carddemo
+#   labels:
+#     app: carddemo
+#     component: ingress
+#     environment: development
+# spec:
+#   rules:
+#     - host: carddemo-dev.example.com
+#       http:
+#         paths:
+#           - path: /
+#             pathType: Prefix
+#             backend:
+#               service:
+#                 name: carddemo-service
+#                 port:
+#                   number: 80
+
+---
+# Notes for Production Deployment:
+#
+# 1. ACM Certificate Setup:
+#    - Create SSL/TLS certificate in AWS Certificate Manager (ACM)
+#    - Validate domain ownership (DNS or email validation)
+#    - Copy certificate ARN and set in annotation:
+#      alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:REGION:ACCOUNT:certificate/ID
+#
+# 2. DNS Configuration:
+#    - After Ingress creation, get ALB DNS name:
+#      kubectl get ingress carddemo-ingress -n carddemo -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+#    - Create CNAME record: carddemo.example.com → ALB-DNS-NAME
+#    - Or use Route 53 Alias record for better performance
+#
+# 3. Security Groups:
+#    - ALB security group automatically created by AWS Load Balancer Controller
+#    - Ensure inbound rules allow:
+#      * Port 80 (HTTP) from 0.0.0.0/0 (will redirect to HTTPS)
+#      * Port 443 (HTTPS) from 0.0.0.0/0
+#    - Ensure pod security group allows inbound from ALB security group on port 8080
+#
+# 4. WAF Integration (optional but recommended for PCI-DSS):
+#    - Create AWS WAF Web ACL with managed rule sets:
+#      * AWSManagedRulesCommonRuleSet (OWASP Top 10 protection)
+#      * AWSManagedRulesKnownBadInputsRuleSet (known malicious patterns)
+#      * AWSManagedRulesSQLiRuleSet (SQL injection protection)
+#    - Associate Web ACL with ALB via annotation:
+#      alb.ingress.kubernetes.io/wafv2-acl-arn: arn:aws:wafv2:REGION:ACCOUNT:regional/webacl/NAME/ID
+#
+# 5. Rate Limiting (optional for DDoS protection):
+#    - Use AWS WAF rate-based rules
+#    - Or use annotation: alb.ingress.kubernetes.io/throttle-burst: '100'
+#
+# 6. Monitoring:
+#    - Enable ALB access logs to S3:
+#      alb.ingress.kubernetes.io/load-balancer-attributes: access_logs.s3.enabled=true,access_logs.s3.bucket=my-bucket
+#    - Monitor ALB metrics in CloudWatch:
+#      * RequestCount, TargetResponseTime, HTTPCode_Target_4XX_Count, HTTPCode_Target_5XX_Count
+#    - Set CloudWatch alarms for 5XX errors and high latency
+#
+# 7. Cost Optimization:
+#    - ALB pricing: $0.0225/hour + $0.008/LCU-hour
+#    - Consider consolidating multiple Ingress resources into one ALB
+#    - Use target-type: ip for better performance (avoids NodePort overhead)
+#
+# 8. Testing SSL Configuration:
+#    - Test HTTPS: curl -v https://carddemo.example.com/actuator/health
+#    - Verify HTTP redirect: curl -I http://carddemo.example.com (should return 301/302 to HTTPS)
+#    - Check SSL/TLS version: openssl s_client -connect carddemo.example.com:443 -tls1_3
+#    - Validate certificate: openssl s_client -showcerts -connect carddemo.example.com:443
+#
+# 9. Troubleshooting:
+#    - Check Ingress status: kubectl describe ingress carddemo-ingress -n carddemo
+#    - Check ALB controller logs: kubectl logs -n kube-system deployment/aws-load-balancer-controller
+#    - Verify service endpoints: kubectl get endpoints carddemo-service -n carddemo
+#    - Test from pod: kubectl run -it --rm debug --image=curlimages/curl --restart=Never -- curl http://carddemo-service/actuator/health
