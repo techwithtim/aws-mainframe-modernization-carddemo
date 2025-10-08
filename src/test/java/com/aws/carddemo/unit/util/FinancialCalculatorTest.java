@@ -215,8 +215,8 @@ class FinancialCalculatorTest {
         BigDecimal largeBalance = new BigDecimal("999999999.99");
         BigDecimal highApr = new BigDecimal("99.99");
         
-        // Expected: 999999999.99 * 99.99 / 1200 = 83,333,333.33 (rounded)
-        BigDecimal expected = new BigDecimal("83333333.33");
+        // Expected: 999999999.99 * 99.99 / 1200 = 83,324,999.99916666... → 83,325,000.00 (HALF_UP)
+        BigDecimal expected = new BigDecimal("83325000.00");
         
         // Act
         BigDecimal interest = FinancialCalculator.calculateMonthlyInterest(largeBalance, highApr);
@@ -1033,6 +1033,6 @@ class FinancialCalculatorTest {
             constructor.newInstance();
         })
             .hasCauseInstanceOf(UnsupportedOperationException.class)
-            .hasMessageContaining("Utility class cannot be instantiated");
+            .hasRootCauseMessage("Utility class cannot be instantiated");
     }
 }
