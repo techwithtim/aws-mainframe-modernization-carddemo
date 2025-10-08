@@ -465,27 +465,41 @@ class DateFormatterTest {
     @Test
     @DisplayName("formatToLegacy() should throw IllegalArgumentException for input without hyphens")
     void testFormatToLegacyWithoutHyphens() {
+        // Input "20230315" has length 8, not 10, so it fails length validation first
         assertThatThrownBy(() -> DateFormatter.formatToLegacy("20230315"))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("INVALID INPUT")
-            .hasMessageContaining("must match pattern");
+            .hasMessageContaining("Expected 10 characters");
     }
 
     @Test
     @DisplayName("formatToLegacy() should throw IllegalArgumentException for input with incorrect hyphen positions")
     void testFormatToLegacyWithIncorrectHyphenPositions() {
+        // Input "2023-3-15" has length 9, not 10, so it fails length validation first
         assertThatThrownBy(() -> DateFormatter.formatToLegacy("2023-3-15"))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("INVALID INPUT")
-            .hasMessageContaining("must match pattern");
+            .hasMessageContaining("Expected 10 characters");
     }
 
     @Test
     @DisplayName("formatToLegacy() should throw IllegalArgumentException for input with slashes instead of hyphens")
     void testFormatToLegacyWithSlashes() {
+        // Input "2023/03/15" has correct length (10) but wrong pattern (slashes instead of hyphens)
         assertThatThrownBy(() -> DateFormatter.formatToLegacy("2023/03/15"))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("INVALID INPUT");
+            .hasMessageContaining("INVALID INPUT")
+            .hasMessageContaining("must match pattern");
+    }
+    
+    @Test
+    @DisplayName("formatToLegacy() should throw IllegalArgumentException for input with letters")
+    void testFormatToLegacyWithLettersInInput() {
+        // Input "202A-03-15" has correct length (10) but contains letters
+        assertThatThrownBy(() -> DateFormatter.formatToLegacy("202A-03-15"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("INVALID INPUT")
+            .hasMessageContaining("must match pattern");
     }
 
     // ==================================================================================
