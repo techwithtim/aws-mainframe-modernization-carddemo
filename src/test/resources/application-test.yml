@@ -1,0 +1,255 @@
+# ============================================================================
+# Spring Boot Test Profile Configuration
+# CardDemo Modernized Application - Test Environment
+# ============================================================================
+# Purpose: Test-specific configuration for unit and integration tests
+# Features: H2 in-memory database, Testcontainers support, auto-DDL,
+#           disabled Flyway, DEBUG logging, test data initialization
+# Migrated from: Legacy COBOL testing approach to modern Spring Boot testing
+# ============================================================================
+
+# ============================================================================
+# Spring Application Configuration
+# ============================================================================
+spring:
+  application:
+    name: carddemo-modernized-test
+  
+  # ============================================================================
+  # Database Configuration - H2 In-Memory Database (Default for Unit Tests)
+  # ============================================================================
+  # NOTE: For integration tests using Testcontainers, these settings are
+  # overridden dynamically by @Testcontainers annotation and PostgreSQLContainer
+  datasource:
+    # H2 in-memory database with PostgreSQL compatibility mode
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
+    
+    # HikariCP Connection Pool - Optimized for Tests
+    hikari:
+      pool-name: CardDemo-Test-Pool
+      maximum-pool-size: 5           # Reduced for test efficiency
+      minimum-idle: 2
+      connection-timeout: 5000        # 5 seconds (faster failure for tests)
+      idle-timeout: 300000            # 5 minutes
+      max-lifetime: 600000            # 10 minutes
+      auto-commit: true
+      connection-test-query: SELECT 1
+  
+  # ============================================================================
+  # JPA/Hibernate Configuration - Auto DDL Creation for Tests
+  # ============================================================================
+  jpa:
+    # Hibernate DDL auto-generation: create-drop for clean test state
+    hibernate:
+      ddl-auto: create-drop           # Create schema at start, drop at end
+    
+    # JPA Properties for Testing
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: true              # Format SQL for readability in logs
+        use_sql_comments: true        # Add comments to generated SQL
+        jdbc:
+          batch_size: 20              # Batch inserts for test data
+          fetch_size: 50
+        order_inserts: true
+        order_updates: true
+        # Show SQL statements (useful for debugging test failures)
+        show_sql: true
+        
+    # Show SQL in console (for debugging)
+    show-sql: true
+    
+    # Open EntityManager in view for test scenarios
+    open-in-view: false               # Keep false for best practices
+  
+  # ============================================================================
+  # Flyway Configuration - DISABLED for Tests
+  # ============================================================================
+  # Flyway is disabled because test schema is auto-created by Hibernate DDL
+  # and test data is loaded via @Sql annotations or test fixtures
+  flyway:
+    enabled: false
+  
+  # ============================================================================
+  # SQL Initialization - Test Data Loading
+  # ============================================================================
+  sql:
+    init:
+      mode: always                    # Always execute SQL scripts
+      encoding: UTF-8
+      # Test data scripts loaded from test-data/ directory
+      # Individual tests can override with @Sql annotations
+      data-locations:
+        - classpath:test-data/account-test-data.sql
+        - classpath:test-data/card-test-data.sql
+        - classpath:test-data/transaction-test-data.sql
+      continue-on-error: false        # Fail fast on SQL errors
+  
+  # ============================================================================
+  # Spring Batch Configuration - DISABLED for Tests
+  # ============================================================================
+  # Spring Batch jobs should NOT auto-execute during tests
+  # Individual batch tests will explicitly launch jobs via JobLauncher
+  batch:
+    job:
+      enabled: false                  # Disable auto-execution of batch jobs
+    jdbc:
+      initialize-schema: always       # Create batch metadata tables
+      table-prefix: BATCH_            # Standard Spring Batch prefix
+  
+  # ============================================================================
+  # Cache Configuration - Simple In-Memory Cache for Tests
+  # ============================================================================
+  cache:
+    type: simple                      # Use simple in-memory cache
+    cache-names:
+      - transactionTypes
+      - transactionCategories
+      - disclosureGroups
+  
+  # ============================================================================
+  # Jackson JSON Configuration
+  # ============================================================================
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+      indent-output: true             # Pretty-print JSON in test logs
+    deserialization:
+      fail-on-unknown-properties: false
+    default-property-inclusion: non_null
+    time-zone: UTC
+  
+  # ============================================================================
+  # Security Configuration - Relaxed for Tests
+  # ============================================================================
+  security:
+    # JWT token settings for test authentication
+    jwt:
+      secret: test-secret-key-for-jwt-token-generation-min-256-bits-required
+      expiration: 3600000             # 1 hour (longer for debugging)
+      refresh-expiration: 86400000    # 24 hours
+
+# ============================================================================
+# Server Configuration
+# ============================================================================
+server:
+  port: 0                             # Random port for parallel test execution
+  servlet:
+    context-path: /
+  error:
+    include-message: always           # Include error messages in responses
+    include-stacktrace: always        # Include stack traces for debugging
+
+# ============================================================================
+# Logging Configuration - DEBUG Level for Troubleshooting
+# ============================================================================
+logging:
+  level:
+    root: INFO
+    
+    # CardDemo application - DEBUG for detailed test logging
+    com.aws.carddemo: DEBUG
+    
+    # Spring Framework - Selective DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.batch: DEBUG
+    org.springframework.test: DEBUG
+    
+    # Hibernate SQL - Show SQL statements
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE  # Show SQL parameters
+    org.hibernate.type: TRACE
+    
+    # Database - Connection pool and JDBC
+    com.zaxxer.hikari: DEBUG
+    org.springframework.jdbc.core: DEBUG
+    
+    # Testcontainers (if used)
+    org.testcontainers: INFO
+    tc: INFO                          # Testcontainers short alias
+  
+  # Log pattern for test output
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+# ============================================================================
+# Management & Actuator Endpoints - Enabled for Tests
+# ============================================================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"                  # Expose all endpoints for test verification
+  endpoint:
+    health:
+      show-details: always            # Always show health details
+  metrics:
+    export:
+      prometheus:
+        enabled: false                # Disable Prometheus in tests
+
+# ============================================================================
+# Test-Specific Application Properties
+# ============================================================================
+# Custom properties for test scenarios
+
+# Validation settings - Can be relaxed for edge case testing
+app:
+  validation:
+    strict-mode: false                # Allow relaxed validation in some tests
+  
+  # Test data settings
+  test:
+    data:
+      auto-load: true                 # Auto-load test fixtures
+      cleanup: true                   # Cleanup after tests
+  
+  # Batch processing test settings
+  batch:
+    chunk-size: 10                    # Smaller chunks for faster tests
+    skip-limit: 5                     # Allow some skips in tests
+    retry-limit: 2                    # Fewer retries in tests
+  
+  # Performance settings for tests
+  performance:
+    timeout-seconds: 30               # Longer timeout for debugging
+    max-concurrent-requests: 10       # Limit concurrent requests in tests
+
+# ============================================================================
+# H2 Console Configuration (Optional - for manual inspection)
+# ============================================================================
+# To enable H2 console during tests, uncomment below:
+# spring:
+#   h2:
+#     console:
+#       enabled: true
+#       path: /h2-console
+
+# ============================================================================
+# Testcontainers Configuration (Alternative to H2)
+# ============================================================================
+# When using @Testcontainers with PostgreSQLContainer, uncomment and adjust:
+#
+# spring:
+#   datasource:
+#     # These will be overridden by Testcontainers DynamicPropertySource
+#     url: ${TESTCONTAINER_POSTGRES_URL:jdbc:postgresql://localhost:5432/testdb}
+#     username: ${TESTCONTAINER_POSTGRES_USER:test}
+#     password: ${TESTCONTAINER_POSTGRES_PASSWORD:test}
+#     driver-class-name: org.postgresql.Driver
+#   jpa:
+#     properties:
+#       hibernate:
+#         dialect: org.hibernate.dialect.PostgreSQLDialect
+#
+# NOTE: Testcontainers will automatically override these at runtime via
+# @DynamicPropertySource in test classes like PostgresTestContainer.java
+
+# ============================================================================
+# End of Test Configuration
+# ============================================================================
