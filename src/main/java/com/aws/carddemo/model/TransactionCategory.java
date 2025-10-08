@@ -14,6 +14,7 @@ import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
@@ -104,6 +105,7 @@ import java.io.Serializable;
 @Table(name = "transaction_category")
 @IdClass(TransactionCategoryId.class)
 @Data
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -146,6 +148,7 @@ public class TransactionCategory implements Serializable {
     @Column(name = "transaction_type_code", length = 2, nullable = false)
     @NotBlank(message = "Transaction type code cannot be blank")
     @Pattern(regexp = "\\d{2}", message = "Transaction type code must be a 2-digit numeric string (e.g., '01', '07')")
+    @EqualsAndHashCode.Include
     private String transactionTypeCode;
 
     /**
@@ -184,6 +187,7 @@ public class TransactionCategory implements Serializable {
     @Column(name = "category_code", length = 4, nullable = false)
     @NotBlank(message = "Category code cannot be blank")
     @Pattern(regexp = "\\d{4}", message = "Category code must be a 4-digit numeric string with leading zeros (e.g., '0001', '0100')")
+    @EqualsAndHashCode.Include
     private String categoryCode;
 
     /**
