@@ -1,0 +1,635 @@
+# ==============================================================================
+# AWS CardDemo Modernized - Spring Boot Application Configuration
+# ==============================================================================
+# Main configuration file for the CardDemo credit card management application
+# migrated from COBOL/CICS/VSAM to Java 21 with Spring Boot 3.x.
+#
+# This file provides default configuration inherited by profile-specific files:
+#   - application-dev.yml (local development)
+#   - application-test.yml (integration testing)
+#   - application-prod.yml (production deployment)
+#
+# Environment variables can be injected via ${VAR_NAME:default_value} syntax
+# for container deployment with Kubernetes ConfigMap and Secret integration.
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Application Identity
+# ------------------------------------------------------------------------------
+spring:
+  application:
+    name: carddemo-modernized
+  
+  # ----------------------------------------------------------------------------
+  # Datasource Configuration - PostgreSQL 15+
+  # ----------------------------------------------------------------------------
+  # Replaces legacy VSAM KSDS datasets with cloud-native PostgreSQL database.
+  # Connection parameters support environment variable substitution for
+  # containerized deployment (Kubernetes ConfigMap/Secret injection).
+  # ----------------------------------------------------------------------------
+  datasource:
+    # JDBC connection URL with environment variable substitution
+    # Format: jdbc:postgresql://<host>:<port>/<database>
+    # Defaults: localhost:5432/carddemo for local development
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:carddemo}
+    
+    # Database credentials (injected from Kubernetes Secret in production)
+    username: ${DB_USER:postgres}
+    password: ${DB_PASS:password}
+    
+    # Connection driver class (PostgreSQL JDBC driver)
+    driver-class-name: org.postgresql.Driver
+    
+    # --------------------------------------------------------------------------
+    # HikariCP Connection Pool Configuration
+    # --------------------------------------------------------------------------
+    # High-performance JDBC connection pool managing database connections.
+    # Pool sizing accommodates 50-100 concurrent requests per pod with
+    # typical query execution times of 20-50ms.
+    # --------------------------------------------------------------------------
+    hikari:
+      # Maximum number of connections in the pool (per pod)
+      # Total capacity scales with pod count: 3 pods × 20 = 60 connections
+      maximum-pool-size: ${HIKARI_MAX_POOL_SIZE:20}
+      
+      # Minimum number of idle connections maintained in the pool
+      # Ensures warm connections available for immediate request handling
+      minimum-idle: ${HIKARI_MIN_IDLE:5}
+      
+      # Maximum time (milliseconds) to wait for connection from pool
+      # Fail-fast behavior after 30 seconds prevents indefinite blocking
+      connection-timeout: ${HIKARI_CONNECTION_TIMEOUT:30000}
+      
+      # Maximum time (milliseconds) a connection can remain idle before removal
+      # 10-minute idle timeout enables connection cleanup during low-traffic periods
+      idle-timeout: ${HIKARI_IDLE_TIMEOUT:600000}
+      
+      # Maximum lifetime (milliseconds) of a connection in the pool
+      # 30-minute lifetime prevents stale connection issues with load balancers
+      max-lifetime: ${HIKARI_MAX_LIFETIME:1800000}
+      
+      # Connection pool name for monitoring and logging
+      pool-name: CardDemoConnectionPool
+      
+      # Enable auto-commit on returned connections
+      auto-commit: true
+      
+      # Connection test query to validate connection health
+      connection-test-query: SELECT 1
+  
+  # ----------------------------------------------------------------------------
+  # JPA / Hibernate Configuration
+  # ----------------------------------------------------------------------------
+  # Object-Relational Mapping (ORM) configuration replacing COBOL file I/O
+  # with declarative entity persistence and SQL generation.
+  # ----------------------------------------------------------------------------
+  jpa:
+    # Database platform dialect (PostgreSQL-specific SQL generation)
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    
+    # DDL auto-generation strategy
+    # validate: Validate schema matches entities (Flyway manages DDL)
+    # create-drop: Auto-create schema on startup, drop on shutdown (dev/test only)
+    # update: Auto-update schema (NOT recommended for production)
+    # none: No schema management by Hibernate
+    hibernate:
+      ddl-auto: validate
+      
+      # Naming strategy for database objects
+      naming:
+        # Physical naming strategy (converts Java camelCase to database snake_case)
+        physical-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+        
+        # Implicit naming strategy (default Spring Boot strategy)
+        implicit-strategy: org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy
+    
+    # Show SQL statements in logs (disabled by default, enable in dev profile)
+    show-sql: false
+    
+    # Hibernate-specific properties
+    properties:
+      hibernate:
+        # Format SQL output for readability (when show-sql=true)
+        format_sql: true
+        
+        # Use SQL comments in generated queries for debugging
+        use_sql_comments: false
+        
+        # JDBC batch size for bulk operations (improves performance)
+        jdbc:
+          batch_size: 50
+          
+        # Default batch fetch size for collections
+        default_batch_fetch_size: 10
+        
+        # Enable second-level cache (reference data caching)
+        cache:
+          use_second_level_cache: true
+          use_query_cache: true
+          region:
+            factory_class: org.hibernate.cache.jcache.JCacheRegionFactory
+        
+        # Statistics collection for performance monitoring (disable in production)
+        generate_statistics: false
+        
+        # Order SQL inserts for better batching performance
+        order_inserts: true
+        order_updates: true
+        
+        # JDBC time zone configuration
+        jdbc:
+          time_zone: UTC
+  
+  # ----------------------------------------------------------------------------
+  # Spring Batch Configuration
+  # ----------------------------------------------------------------------------
+  # Batch processing framework replacing mainframe JCL batch jobs.
+  # Jobs: Transaction posting, interest calculation, statement generation.
+  # ----------------------------------------------------------------------------
+  batch:
+    # JDBC-based job repository initialization
+    jdbc:
+      # Always initialize Spring Batch metadata tables on startup
+      # Tables: batch_job_instance, batch_job_execution, batch_step_execution
+      initialize-schema: always
+    
+    # Job execution configuration
+    job:
+      # Disable automatic job execution on application startup
+      # Jobs triggered explicitly via REST API or Kubernetes CronJob
+      enabled: false
+      
+    # Job repository settings
+    isolation-level-for-create: default
+    table-prefix: BATCH_
+  
+  # ----------------------------------------------------------------------------
+  # Flyway Database Migration Configuration
+  # ----------------------------------------------------------------------------
+  # Version-controlled schema evolution replacing manual DDL execution.
+  # Migration scripts located in src/main/resources/db/migration/
+  # ----------------------------------------------------------------------------
+  flyway:
+    # Enable Flyway migrations on application startup
+    enabled: true
+    
+    # Location of migration scripts (classpath and filesystem paths)
+    locations: classpath:db/migration
+    
+    # Baseline version for existing databases (skip migrations before this version)
+    baseline-on-migrate: true
+    baseline-version: 0
+    
+    # Validate applied migrations against available migration scripts
+    validate-on-migrate: true
+    
+    # Allow out-of-order migration execution (not recommended for production)
+    out-of-order: false
+    
+    # Schema names for Flyway metadata table (default: public)
+    schemas: public
+    
+    # Flyway metadata table name
+    table: flyway_schema_history
+  
+  # ----------------------------------------------------------------------------
+  # Jackson JSON Serialization Configuration
+  # ----------------------------------------------------------------------------
+  # JSON processing for REST API request/response bodies.
+  # ----------------------------------------------------------------------------
+  jackson:
+    # Date/time serialization format
+    date-format: yyyy-MM-dd'T'HH:mm:ss.SSS'Z'
+    time-zone: UTC
+    
+    # Serialization settings
+    serialization:
+      # Write dates as ISO-8601 strings (not timestamps)
+      write-dates-as-timestamps: false
+      
+      # Fail on empty beans (detect serialization issues early)
+      fail-on-empty-beans: false
+      
+      # Indent JSON output for readability (disable in production for bandwidth)
+      indent-output: false
+    
+    # Deserialization settings
+    deserialization:
+      # Fail on unknown JSON properties (strict validation)
+      fail-on-unknown-properties: true
+      
+      # Accept single value as array for collections
+      accept-single-value-as-array: true
+    
+    # Default property inclusion strategy
+    default-property-inclusion: non_null
+  
+  # ----------------------------------------------------------------------------
+  # Spring MVC Configuration
+  # ----------------------------------------------------------------------------
+  mvc:
+    # Path matching strategy (ANT-based pattern matching)
+    pathmatch:
+      matching-strategy: ant_path_matcher
+    
+    # Exception handling
+    throw-exception-if-no-handler-found: true
+    
+    # Static resource handling
+    static-path-pattern: /static/**
+  
+  # ----------------------------------------------------------------------------
+  # Resource Handling
+  # ----------------------------------------------------------------------------
+  web:
+    resources:
+      # Disable default Spring Boot error page (use custom error handling)
+      add-mappings: false
+
+# ------------------------------------------------------------------------------
+# Server Configuration
+# ------------------------------------------------------------------------------
+# Embedded Tomcat servlet container configuration.
+# ------------------------------------------------------------------------------
+server:
+  # HTTP port for REST API endpoints
+  port: ${SERVER_PORT:8080}
+  
+  # Servlet context path (root path for all endpoints)
+  servlet:
+    context-path: /
+    
+    # Session timeout (30 minutes)
+    session:
+      timeout: 30m
+  
+  # Tomcat-specific settings
+  tomcat:
+    # Maximum number of worker threads
+    threads:
+      max: 200
+      min-spare: 10
+    
+    # Maximum number of connections server will accept and process
+    max-connections: 10000
+    
+    # Maximum size of HTTP post content (10MB)
+    max-http-post-size: 10485760
+    
+    # Accept count (queue size for incoming connections)
+    accept-count: 100
+    
+    # Connection timeout (20 seconds)
+    connection-timeout: 20000
+    
+    # URI encoding
+    uri-encoding: UTF-8
+  
+  # HTTP compression (gzip)
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain,application/javascript,text/css
+    min-response-size: 1024
+  
+  # Error handling
+  error:
+    # Include exception message in error response (disable in production)
+    include-exception: false
+    
+    # Include stack trace in error response (disable in production)
+    include-stacktrace: never
+    
+    # Include error message in response
+    include-message: always
+    
+    # Custom error path
+    path: /error
+
+# ------------------------------------------------------------------------------
+# Spring Actuator Management Endpoints
+# ------------------------------------------------------------------------------
+# Health checks, metrics, and monitoring endpoints for Kubernetes probes
+# and Prometheus metrics collection.
+# ------------------------------------------------------------------------------
+management:
+  # Management server configuration
+  server:
+    # Use main server port (not separate management port)
+    port: ${SERVER_PORT:8080}
+  
+  # Endpoint exposure configuration
+  endpoints:
+    web:
+      # Base path for actuator endpoints
+      base-path: /actuator
+      
+      # Expose specific endpoints (health, info, metrics, prometheus)
+      exposure:
+        include: health,info,metrics,prometheus
+        
+        # Exclude sensitive endpoints by default
+        exclude: shutdown,heapdump,threaddump
+  
+  # Individual endpoint configuration
+  endpoint:
+    # Health endpoint configuration
+    health:
+      # Show detailed health information (disk space, database, etc.)
+      show-details: when-authorized
+      show-components: when-authorized
+      
+      # Enable health probes for Kubernetes
+      probes:
+        enabled: true
+      
+      # Liveness probe settings (application is alive)
+      livenessState:
+        enabled: true
+      
+      # Readiness probe settings (application is ready to accept traffic)
+      readinessState:
+        enabled: true
+    
+    # Metrics endpoint configuration
+    metrics:
+      enabled: true
+    
+    # Prometheus endpoint configuration
+    prometheus:
+      enabled: true
+    
+    # Info endpoint configuration
+    info:
+      enabled: true
+  
+  # Health indicators configuration
+  health:
+    # Enable default health indicators
+    defaults:
+      enabled: true
+    
+    # Database health check
+    db:
+      enabled: true
+    
+    # Disk space health check
+    diskspace:
+      enabled: true
+      threshold: 10485760  # 10MB minimum free space
+  
+  # Metrics export configuration
+  metrics:
+    # Prometheus metrics export
+    export:
+      prometheus:
+        enabled: true
+        
+        # Include JVM metrics
+        step: 1m
+        
+        # Descriptions in Prometheus format
+        descriptions: true
+    
+    # Distribution statistics for percentiles
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+    
+    # Tag configuration
+    tags:
+      application: ${spring.application.name}
+      environment: ${SPRING_PROFILES_ACTIVE:default}
+  
+  # Tracing configuration (distributed tracing support)
+  tracing:
+    sampling:
+      probability: 1.0  # Sample 100% of requests (adjust in production)
+  
+  # Info endpoint content
+  info:
+    env:
+      enabled: true
+    java:
+      enabled: true
+    os:
+      enabled: true
+
+# ------------------------------------------------------------------------------
+# Logging Configuration
+# ------------------------------------------------------------------------------
+# Log levels for application packages and third-party libraries.
+# Structured logging configured in logback-spring.xml.
+# ------------------------------------------------------------------------------
+logging:
+  # Log levels by package
+  level:
+    # Application package (DEBUG for detailed logging)
+    com.aws.carddemo: ${LOG_LEVEL_APP:DEBUG}
+    
+    # Spring Framework (INFO to reduce noise)
+    org.springframework: ${LOG_LEVEL_SPRING:INFO}
+    org.springframework.web: ${LOG_LEVEL_SPRING_WEB:INFO}
+    org.springframework.security: ${LOG_LEVEL_SPRING_SECURITY:INFO}
+    org.springframework.boot: ${LOG_LEVEL_SPRING_BOOT:INFO}
+    
+    # Hibernate SQL logging (DEBUG to see generated SQL)
+    org.hibernate.SQL: ${LOG_LEVEL_HIBERNATE_SQL:DEBUG}
+    org.hibernate.type.descriptor.sql.BasicBinder: ${LOG_LEVEL_HIBERNATE_PARAMS:TRACE}
+    org.hibernate.engine.jdbc: ${LOG_LEVEL_HIBERNATE_JDBC:INFO}
+    
+    # HikariCP connection pool logging
+    com.zaxxer.hikari: ${LOG_LEVEL_HIKARI:INFO}
+    
+    # Flyway migration logging
+    org.flywaydb: ${LOG_LEVEL_FLYWAY:INFO}
+    
+    # Tomcat server logging
+    org.apache.catalina: ${LOG_LEVEL_TOMCAT:INFO}
+    org.apache.tomcat: ${LOG_LEVEL_TOMCAT:INFO}
+  
+  # Log file configuration (optional file output)
+  file:
+    name: ${LOG_FILE_NAME:logs/carddemo.log}
+    max-size: 10MB
+    max-history: 30
+    total-size-cap: 1GB
+  
+  # Log pattern for console output (overridden by logback-spring.xml)
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# ------------------------------------------------------------------------------
+# Spring Security Configuration
+# ------------------------------------------------------------------------------
+# JWT-based authentication replacing mainframe RACF security.
+# Detailed security configuration in SecurityConfig.java.
+# ------------------------------------------------------------------------------
+security:
+  # JWT token configuration
+  jwt:
+    # Secret key for JWT signature (injected from Kubernetes Secret)
+    secret: ${JWT_SECRET:changeme-this-is-not-secure-for-production-use-only}
+    
+    # Token expiration time (1 hour)
+    expiration: ${JWT_EXPIRATION:3600000}
+    
+    # Token issuer
+    issuer: ${JWT_ISSUER:carddemo-api}
+    
+    # Token audience
+    audience: ${JWT_AUDIENCE:carddemo-users}
+  
+  # Password encoding configuration
+  password:
+    # BCrypt strength (number of rounds, 10-12 recommended)
+    bcrypt-strength: ${PASSWORD_BCRYPT_STRENGTH:10}
+
+# ------------------------------------------------------------------------------
+# Application-Specific Configuration
+# ------------------------------------------------------------------------------
+# Custom application settings for CardDemo business logic.
+# ------------------------------------------------------------------------------
+carddemo:
+  # Account management settings
+  account:
+    # Default credit limit for new accounts
+    default-credit-limit: 5000.00
+    
+    # Minimum account balance (prevents negative balances)
+    min-balance: 0.00
+    
+    # Maximum transaction amount (fraud prevention)
+    max-transaction-amount: 10000.00
+  
+  # Transaction processing settings
+  transaction:
+    # Transaction posting batch size (Spring Batch chunk size)
+    batch-chunk-size: ${TRANSACTION_BATCH_CHUNK_SIZE:100}
+    
+    # Transaction retry attempts for transient failures
+    retry-attempts: 3
+    
+    # Transaction timeout (milliseconds)
+    timeout: 30000
+  
+  # Interest calculation settings
+  interest:
+    # Interest calculation batch size
+    batch-chunk-size: ${INTEREST_BATCH_CHUNK_SIZE:100}
+    
+    # Minimum balance for interest accrual
+    min-balance-for-interest: 0.01
+    
+    # Interest calculation precision (decimal places)
+    calculation-scale: 2
+    
+    # Rounding mode for interest calculations
+    rounding-mode: HALF_UP
+  
+  # Statement generation settings
+  statement:
+    # Statement generation batch size
+    batch-chunk-size: ${STATEMENT_BATCH_CHUNK_SIZE:50}
+    
+    # Statement output directory
+    output-directory: ${STATEMENT_OUTPUT_DIR:/tmp/statements}
+    
+    # Statement format (HTML, PDF, TEXT)
+    output-format: ${STATEMENT_FORMAT:HTML}
+  
+  # Authentication settings
+  auth:
+    # Maximum failed login attempts before account lockout
+    max-failed-attempts: ${AUTH_MAX_FAILED_ATTEMPTS:5}
+    
+    # Account lockout duration (minutes)
+    lockout-duration: ${AUTH_LOCKOUT_DURATION:30}
+    
+    # Session timeout (minutes)
+    session-timeout: ${AUTH_SESSION_TIMEOUT:30}
+  
+  # PCI-DSS compliance settings
+  security:
+    # Enable sensitive data masking in logs
+    mask-sensitive-data: true
+    
+    # Sensitive field patterns for masking (regex)
+    sensitive-patterns:
+      - card-number
+      - ssn
+      - cvv
+      - password
+    
+    # Audit logging settings
+    audit:
+      enabled: true
+      log-requests: true
+      log-responses: false  # Prevent sensitive data in response logs
+
+# ------------------------------------------------------------------------------
+# Spring Profiles
+# ------------------------------------------------------------------------------
+# Active profiles configuration (injected from environment)
+# Supported profiles: dev, test, prod
+# ------------------------------------------------------------------------------
+spring:
+  profiles:
+    # Default active profile (overridden by SPRING_PROFILES_ACTIVE env var)
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+    
+    # Allow profile-specific property files to add configuration
+    include: []
+
+# ------------------------------------------------------------------------------
+# API Documentation Configuration (Swagger/OpenAPI)
+# ------------------------------------------------------------------------------
+# OpenAPI 3.0 documentation for REST API endpoints.
+# Detailed configuration in OpenApiConfig.java.
+# ------------------------------------------------------------------------------
+springdoc:
+  # API documentation path
+  api-docs:
+    path: /api-docs
+    enabled: true
+  
+  # Swagger UI path
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    display-request-duration: true
+    operations-sorter: method
+    tags-sorter: alpha
+  
+  # Packages to scan for API documentation
+  packages-to-scan: com.aws.carddemo.controller
+  
+  # Paths to include in documentation
+  paths-to-match: /api/**
+
+# ------------------------------------------------------------------------------
+# Message Source Configuration (Internationalization)
+# ------------------------------------------------------------------------------
+# Message bundles for error messages and user-facing text.
+# Messages defined in messages.properties and messages_en.properties.
+# ------------------------------------------------------------------------------
+spring:
+  messages:
+    # Base name for message bundles
+    basename: messages
+    
+    # Message bundle encoding
+    encoding: UTF-8
+    
+    # Cache duration for message bundles (-1 = cache forever)
+    cache-duration: -1
+    
+    # Fallback to system locale if message not found
+    fallback-to-system-locale: true
+    
+    # Use code as default message if message not found
+    use-code-as-default-message: false
+
+# ------------------------------------------------------------------------------
+# END OF CONFIGURATION
+# ------------------------------------------------------------------------------
