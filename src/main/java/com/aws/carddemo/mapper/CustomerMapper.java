@@ -110,7 +110,6 @@ public interface CustomerMapper {
      * @return CustomerResponse DTO with masked PII fields, or null if input is null
      */
     @Mapping(source = "ssnMasked", target = "ssnMasked")
-    @Mapping(target = "govtIssuedId", ignore = true)
     CustomerResponse toResponse(Customer customer);
 
     /**
