@@ -134,7 +134,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @SuperBuilder
-@ToString(callSuper = true, exclude = {"account", "cardNumber"})
+@ToString(callSuper = true)
 @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class Transaction extends BaseEntity implements Serializable {
 
@@ -207,6 +207,7 @@ public class Transaction extends BaseEntity implements Serializable {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "account_id", nullable = false, foreignKey = @ForeignKey(name = "fk_transaction_account"))
     @NotNull(message = "Account is required")
+    @ToString.Exclude
     private Account account;
 
     /**
