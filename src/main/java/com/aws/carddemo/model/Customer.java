@@ -69,6 +69,7 @@ import java.util.List;
  * <pre>
  * CREATE TABLE customer (
  *   customer_id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+ *   cust_id VARCHAR(9) UNIQUE NOT NULL,
  *   first_name VARCHAR(25) NOT NULL,
  *   middle_name VARCHAR(25),
  *   last_name VARCHAR(25) NOT NULL,
@@ -93,6 +94,7 @@ import java.util.List;
  *   CONSTRAINT chk_pri_card_holder CHECK (primary_cardholder_indicator IN ('Y', 'N'))
  * );
  * 
+ * CREATE UNIQUE INDEX idx_customer_cust_id ON customer(cust_id);
  * CREATE UNIQUE INDEX idx_customer_ssn ON customer(ssn);
  * CREATE INDEX idx_customer_name ON customer(last_name, first_name);
  * </pre>
@@ -107,7 +109,8 @@ import java.util.List;
  * <p><b>COBOL to Java Data Type Mappings:</b>
  * <table border="1">
  *   <tr><th>COBOL Field</th><th>COBOL Type</th><th>Java Field</th><th>Java Type</th></tr>
- *   <tr><td>CUST-ID</td><td>PIC 9(09)</td><td>customerId</td><td>Long (auto-increment)</td></tr>
+ *   <tr><td>N/A (synthetic)</td><td>N/A</td><td>customerId</td><td>Long (PK, auto-increment)</td></tr>
+ *   <tr><td>CUST-ID</td><td>PIC 9(09)</td><td>custId</td><td>String (9 digits, business key)</td></tr>
  *   <tr><td>CUST-FIRST-NAME</td><td>PIC X(25)</td><td>firstName</td><td>String (max 25)</td></tr>
  *   <tr><td>CUST-MIDDLE-NAME</td><td>PIC X(25)</td><td>middleName</td><td>String (max 25)</td></tr>
  *   <tr><td>CUST-LAST-NAME</td><td>PIC X(25)</td><td>lastName</td><td>String (max 25)</td></tr>
@@ -161,6 +164,7 @@ import java.util.List;
 @Table(
     name = "customer",
     indexes = {
+        @Index(name = "idx_customer_cust_id", columnList = "cust_id", unique = true),
         @Index(name = "idx_customer_ssn", columnList = "ssn", unique = true),
         @Index(name = "idx_customer_name", columnList = "last_name, first_name")
     }
@@ -202,6 +206,33 @@ public class Customer extends BaseEntity {
     @Column(name = "customer_id", nullable = false)
     @EqualsAndHashCode.Include
     private Long customerId;
+
+    /**
+     * Customer business key (9-digit numeric ID from COBOL system).
+     * 
+     * <p><b>Legacy Mapping:</b> CUST-ID PIC 9(09) from CVCUS01Y.cpy.
+     * 
+     * <p>This is the business identifier from the legacy COBOL/VSAM system,
+     * stored as a zero-padded 9-character string to preserve leading zeros.
+     * 
+     * <p><b>Example:</b> "000000001" for customer 1, "000012345" for customer 12345
+     * 
+     * <p><b>Validation:</b>
+     * <ul>
+     *   <li>{@code @NotBlank}: Required field, cannot be null or empty</li>
+     *   <li>{@code @Pattern}: Must be exactly 9 numeric digits (0-9)</li>
+     *   <li>{@code @Column(unique=true)}: Unique constraint across all customers</li>
+     * </ul>
+     * 
+     * <p><b>Database Schema:</b> cust_id VARCHAR(9) UNIQUE NOT NULL
+     * 
+     * <p><b>Note:</b> This is the business/natural key. The {@code customerId} field
+     * is the synthetic surrogate primary key used for database relationships.
+     */
+    @NotBlank(message = "Customer business ID is required")
+    @Pattern(regexp = "\\d{9}", message = "Customer ID must be exactly 9 numeric digits")
+    @Column(name = "cust_id", length = 9, unique = true, nullable = false)
+    private String custId;
 
     /**
      * Customer's legal first name (given name).

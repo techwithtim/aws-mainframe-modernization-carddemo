@@ -42,6 +42,9 @@ spring:
   # JPA/Hibernate Configuration - Auto DDL Creation for Tests
   # ============================================================================
   jpa:
+    # Defer SQL initialization until after JPA schema creation
+    defer-datasource-initialization: true
+    
     # Hibernate DDL auto-generation: create-drop for clean test state
     hibernate:
       ddl-auto: create-drop           # Create schema at start, drop at end

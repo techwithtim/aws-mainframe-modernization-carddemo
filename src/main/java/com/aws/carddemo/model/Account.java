@@ -80,7 +80,8 @@ public class Account extends BaseEntity implements Serializable {
     /**
      * Unique account identifier, auto-generated primary key.
      * 
-     * <p><b>Legacy Mapping:</b> ACCT-ID PIC 9(11) from CVACT01Y.cpy.
+     * <p><b>Note:</b> This is the synthetic surrogate primary key used for database 
+     * relationships. The business/natural key from COBOL is stored in {@code acctId}.
      */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -88,10 +89,40 @@ public class Account extends BaseEntity implements Serializable {
     private Long accountId;
 
     /**
+     * Account business key (11-digit numeric ID from COBOL system).
+     * 
+     * <p><b>Legacy Mapping:</b> ACCT-ID PIC 9(11) from CVACT01Y.cpy.
+     * 
+     * <p>This is the business identifier from the legacy COBOL/VSAM system,
+     * stored as a zero-padded 11-character string to preserve leading zeros.
+     * 
+     * <p><b>Example:</b> "00000000001" for account 1, "00012345678" for account 12345678
+     * 
+     * <p><b>Validation:</b>
+     * <ul>
+     *   <li>{@code @NotBlank}: Required field, cannot be null or empty</li>
+     *   <li>{@code @Pattern}: Must be exactly 11 numeric digits (0-9)</li>
+     *   <li>{@code @Column(unique=true)}: Unique constraint across all accounts</li>
+     * </ul>
+     * 
+     * <p><b>Database Schema:</b> acct_id VARCHAR(11) UNIQUE NOT NULL
+     * 
+     * <p><b>Note:</b> This is the business/natural key that uniquely identifies
+     * the account in business operations and corresponds to COBOL ACCT-ID field.
+     */
+    @NotBlank(message = "Account business ID is required")
+    @Pattern(regexp = "\\d{11}", message = "Account ID must be exactly 11 numeric digits")
+    @Column(name = "acct_id", length = 11, unique = true, nullable = false)
+    private String acctId;
+
+    /**
      * Account number (11 digits, unique identifier for customer-facing operations).
      * 
      * <p><b>Data Type:</b> Stored as VARCHAR to preserve leading zeros.
      * <p><b>Business Rule:</b> Must be exactly 11 digits for validation.
+     * 
+     * <p><b>Note:</b> This may be the same as {@code acctId} or a formatted version
+     * for display purposes. Keeping for backward compatibility with existing code.
      */
     @NotBlank(message = "Account number is required")
     @Size(min = 11, max = 11, message = "Account number must be exactly 11 digits")

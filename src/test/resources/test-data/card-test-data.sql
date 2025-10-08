@@ -285,204 +285,204 @@ VALUES (50, '9805583408996588', 40, 'Davon Emmerich', '2023-10-27', 'Y', CURRENT
 -- ===================================================================================
 
 -- Cross-reference 1: Card 0500024453765740 → Customer 5, Account 50
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('0500024453765740', 5, 50, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('0500024453765740', '000000005', '00000000050', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 2: Card 0683586198171516 → Customer 27, Account 27
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('0683586198171516', 27, 27, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('0683586198171516', '000000027', '00000000027', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 3: Card 0923877193247330 → Customer 2, Account 2
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('0923877193247330', 2, 2, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('0923877193247330', '000000002', '00000000002', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 4: Card 0927987108636232 → Customer 20, Account 20
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('0927987108636232', 20, 20, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('0927987108636232', '000000020', '00000000020', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 5: Card 0982496213629795 → Customer 12, Account 12
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('0982496213629795', 12, 12, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('0982496213629795', '000000012', '00000000012', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 6: Card 1014086565224350 → Customer 44, Account 44
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('1014086565224350', 44, 44, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('1014086565224350', '000000044', '00000000044', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 7: Card 1142167692878931 → Customer 37, Account 37
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('1142167692878931', 37, 37, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('1142167692878931', '000000037', '00000000037', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 8: Card 1561409106491600 → Customer 35, Account 35
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('1561409106491600', 35, 35, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('1561409106491600', '000000035', '00000000035', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 9: Card 2745303720002090 → Customer 39, Account 39
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('2745303720002090', 39, 39, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('2745303720002090', '000000039', '00000000039', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 10: Card 2760836797107565 → Customer 24, Account 24
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('2760836797107565', 24, 24, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('2760836797107565', '000000024', '00000000024', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 11: Card 2871968252812490 → Customer 6, Account 6
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('2871968252812490', 6, 6, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('2871968252812490', '000000006', '00000000006', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 12: Card 2940139362300449 → Customer 22, Account 22
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('2940139362300449', 22, 22, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('2940139362300449', '000000022', '00000000022', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 13: Card 2988091353094312 → Customer 4, Account 4
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('2988091353094312', 4, 4, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('2988091353094312', '000000004', '00000000004', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 14: Card 3260763612337560 → Customer 10, Account 10
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('3260763612337560', 10, 10, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('3260763612337560', '000000010', '00000000010', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 15: Card 3766281984155154 → Customer 41, Account 41
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('3766281984155154', 41, 41, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('3766281984155154', '000000041', '00000000041', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 16: Card 3940246016141489 → Customer 19, Account 19
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('3940246016141489', 19, 19, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('3940246016141489', '000000019', '00000000019', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 17: Card 3999169246375885 → Customer 3, Account 3
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('3999169246375885', 3, 3, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('3999169246375885', '000000003', '00000000003', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 18: Card 4011500891777367 → Customer 13, Account 13
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('4011500891777367', 13, 13, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('4011500891777367', '000000013', '00000000013', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 19: Card 4385271476627819 → Customer 34, Account 34
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('4385271476627819', 34, 34, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('4385271476627819', '000000034', '00000000034', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 20: Card 4534784102713951 → Customer 36, Account 36
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('4534784102713951', 36, 36, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('4534784102713951', '000000036', '00000000036', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 21: Card 4859452612877065 → Customer 7, Account 7
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('4859452612877065', 7, 7, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('4859452612877065', '000000007', '00000000007', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 22: Card 5407099850479866 → Customer 21, Account 21
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('5407099850479866', 21, 21, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('5407099850479866', '000000021', '00000000021', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 23: Card 5656830544981216 → Customer 46, Account 46
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('5656830544981216', 46, 46, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('5656830544981216', '000000046', '00000000046', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 24: Card 5671184478505844 → Customer 18, Account 18
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('5671184478505844', 18, 18, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('5671184478505844', '000000018', '00000000018', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 25: Card 5787351228879339 → Customer 47, Account 47
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('5787351228879339', 47, 47, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('5787351228879339', '000000047', '00000000047', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 26: Card 5975117516616077 → Customer 42, Account 42
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('5975117516616077', 42, 42, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('5975117516616077', '000000042', '00000000042', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 27: Card 6009619150674526 → Customer 5, Account 5
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('6009619150674526', 5, 5, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('6009619150674526', '000000005', '00000000005', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 28: Card 6349250331648509 → Customer 15, Account 15
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('6349250331648509', 15, 15, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('6349250331648509', '000000015', '00000000015', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 29: Card 6503535181795992 → Customer 48, Account 48
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('6503535181795992', 48, 48, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('6503535181795992', '000000048', '00000000048', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 30: Card 6509230362553816 → Customer 30, Account 30
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('6509230362553816', 30, 30, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('6509230362553816', '000000030', '00000000030', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 31: Card 6723000463207764 → Customer 28, Account 28
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('6723000463207764', 28, 28, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('6723000463207764', '000000028', '00000000028', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 32: Card 6727055190616014 → Customer 16, Account 16
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('6727055190616014', 16, 16, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('6727055190616014', '000000016', '00000000016', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 33: Card 6832676047698087 → Customer 33, Account 33
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('6832676047698087', 33, 33, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('6832676047698087', '000000033', '00000000033', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 34: Card 7026637615032277 → Customer 31, Account 31
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('7026637615032277', 31, 31, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('7026637615032277', '000000031', '00000000031', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 35: Card 7058267261837752 → Customer 43, Account 43
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('7058267261837752', 43, 43, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('7058267261837752', '000000043', '00000000043', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 36: Card 7094142751055551 → Customer 32, Account 32
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('7094142751055551', 32, 32, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('7094142751055551', '000000032', '00000000032', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 37: Card 7251508149188883 → Customer 29, Account 29
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('7251508149188883', 29, 29, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('7251508149188883', '000000029', '00000000029', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 38: Card 7379335634661142 → Customer 45, Account 45
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('7379335634661142', 45, 45, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('7379335634661142', '000000045', '00000000045', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 39: Card 7427684863423209 → Customer 11, Account 11
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('7427684863423209', 11, 11, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('7427684863423209', '000000011', '00000000011', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 40: Card 7443870988897530 → Customer 38, Account 38
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('7443870988897530', 38, 38, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('7443870988897530', '000000038', '00000000038', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 41: Card 8040580410348680 → Customer 26, Account 26
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('8040580410348680', 26, 26, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('8040580410348680', '000000026', '00000000026', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 42: Card 8112545834239735 → Customer 23, Account 23
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('8112545834239735', 23, 23, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('8112545834239735', '000000023', '00000000023', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 43: Card 8262593602473076 → Customer 49, Account 49
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('8262593602473076', 49, 49, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('8262593602473076', '000000049', '00000000049', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 44: Card 8517866958206008 → Customer 14, Account 14
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('8517866958206008', 14, 14, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('8517866958206008', '000000014', '00000000014', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 45: Card 8931369351894783 → Customer 8, Account 8
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('8931369351894783', 8, 8, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('8931369351894783', '000000008', '00000000008', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 46: Card 9056297931664011 → Customer 25, Account 25
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('9056297931664011', 25, 25, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('9056297931664011', '000000025', '00000000025', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 47: Card 9349107475869214 → Customer 17, Account 17
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('9349107475869214', 17, 17, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('9349107475869214', '000000017', '00000000017', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 48: Card 9501733721429893 → Customer 9, Account 9
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('9501733721429893', 9, 9, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('9501733721429893', '000000009', '00000000009', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 49: Card 9680294154603697 → Customer 1, Account 1
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('9680294154603697', 1, 1, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('9680294154603697', '000000001', '00000000001', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Cross-reference 50: Card 9805583408996588 → Customer 40, Account 40
-INSERT INTO card_xref (card_number, customer_id, account_id, created_at)
-VALUES ('9805583408996588', 40, 40, CURRENT_TIMESTAMP);
+INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated_at, version)
+VALUES ('9805583408996588', '000000040', '00000000040', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- ===================================================================================
 -- End of Card Test Data
