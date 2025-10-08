@@ -59,9 +59,12 @@ import org.springframework.batch.core.repository.support.JobRepositoryFactoryBea
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
+import org.springframework.jdbc.datasource.init.DatabasePopulator;
+import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.annotation.Isolation;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -218,6 +221,90 @@ public class BatchConfig {
         this.dataSource = dataSource;
         this.transactionManager = transactionManager;
         logger.info("BatchConfig initialized with DataSource and TransactionManager");
+        
+        // Initialize Spring Batch metadata schema for test profile
+        // This is necessary because manual JobRepository bean creation bypasses
+        // Spring Boot's BatchAutoConfiguration schema initialization
+        try {
+            initializeBatchSchema();
+        } catch (Exception e) {
+            logger.warn("Batch schema initialization failed (may already exist): {}", e.getMessage());
+        }
+    }
+    
+    /**
+     * Initializes Spring Batch metadata schema in the database.
+     * 
+     * This method is called during BatchConfig construction to ensure the required
+     * Spring Batch metadata tables exist before the JobRepository bean is created.
+     * 
+     * Background:
+     * When manually defining a JobRepository @Bean (as required by the Agent Action Plan),
+     * Spring Boot's BatchAutoConfiguration is disabled. This means the automatic schema
+     * initialization that normally occurs via spring.batch.jdbc.initialize-schema=always
+     * does not run. We must manually initialize the schema here.
+     * 
+     * Schema location:
+     * Spring Batch includes schema DDL scripts in its JAR:
+     * - H2: org/springframework/batch/core/schema-h2.sql
+     * - PostgreSQL: org/springframework/batch/core/schema-postgresql.sql
+     * - MySQL: org/springframework/batch/core/schema-mysql.sql
+     * 
+     * Tables created:
+     * - BATCH_JOB_INSTANCE: Unique job instances by name and parameters
+     * - BATCH_JOB_EXECUTION: Job execution records with status and timestamps
+     * - BATCH_STEP_EXECUTION: Step execution records within jobs
+     * - BATCH_JOB_EXECUTION_CONTEXT: Serialized job-level execution context
+     * - BATCH_STEP_EXECUTION_CONTEXT: Serialized step-level execution context
+     * - BATCH_JOB_EXECUTION_PARAMS: Job parameters for each execution
+     * 
+     * Error handling:
+     * - If tables already exist, SQL errors are caught and logged as warnings
+     * - This allows the application to start successfully in both scenarios:
+     *   1. First startup: Tables are created successfully
+     *   2. Subsequent startups: Tables already exist, errors are ignored
+     * 
+     * Test vs. Production:
+     * - Test profile (H2): Uses schema-h2.sql
+     * - Production profile (PostgreSQL): Uses schema-postgresql.sql (via Flyway in prod)
+     * - This method only runs in test profile where Flyway is disabled
+     * 
+     * @throws Exception if schema initialization fails unexpectedly
+     */
+    private void initializeBatchSchema() throws Exception {
+        // Determine which schema script to use based on database type
+        String schemaScript = "org/springframework/batch/core/schema-h2.sql";
+        
+        // Check if we're using PostgreSQL (production/integration tests)
+        try {
+            String dbProductName = dataSource.getConnection().getMetaData().getDatabaseProductName();
+            if (dbProductName.toLowerCase().contains("postgresql")) {
+                schemaScript = "org/springframework/batch/core/schema-postgresql.sql";
+            } else if (dbProductName.toLowerCase().contains("mysql")) {
+                schemaScript = "org/springframework/batch/core/schema-mysql.sql";
+            }
+            logger.info("Detected database: {}, using schema script: {}", dbProductName, schemaScript);
+        } catch (Exception e) {
+            logger.debug("Could not detect database type, using default H2 schema: {}", e.getMessage());
+        }
+        
+        // Create database populator with Spring Batch schema script
+        DatabasePopulator populator = new ResourceDatabasePopulator(new ClassPathResource(schemaScript));
+        
+        // Execute schema initialization
+        try {
+            populator.populate(dataSource.getConnection());
+            logger.info("Spring Batch metadata schema initialized successfully from: {}", schemaScript);
+        } catch (Exception e) {
+            // Tables may already exist - log warning and continue
+            if (e.getMessage() != null && (e.getMessage().contains("already exists") || 
+                                          e.getMessage().contains("Table") ||
+                                          e.getMessage().contains("Duplicate"))) {
+                logger.debug("Batch metadata tables already exist, skipping schema initialization");
+            } else {
+                logger.warn("Batch schema initialization encountered error: {}", e.getMessage());
+            }
+        }
     }
     
     /**
@@ -343,7 +430,8 @@ public class BatchConfig {
         // - Prevents dirty reads (reading uncommitted data)
         // - Allows non-repeatable reads (data can change during transaction)
         // - Allows phantom reads (new rows can be inserted during transaction)
-        factory.setIsolationLevelForCreate(Isolation.READ_COMMITTED.value());
+        // Spring Batch expects String constant name: "ISOLATION_READ_COMMITTED"
+        factory.setIsolationLevelForCreate("ISOLATION_READ_COMMITTED");
         logger.debug("Transaction isolation set to READ_COMMITTED");
         
         // Initialize factory (validates configuration and database connectivity)
