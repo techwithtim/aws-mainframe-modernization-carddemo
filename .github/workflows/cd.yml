@@ -1,0 +1,570 @@
+# GitHub Actions Continuous Deployment Pipeline
+# 
+# This workflow replaces legacy mainframe JCL job submission scripts 
+# (remote_submit.sh, run_full_batch.sh) with modern Kubernetes deployment
+# 
+# Migrated from: scripts/remote_submit.sh, scripts/run_full_batch.sh
+# Legacy approach: FTP-based JCL submission to JES on z/OS mainframe
+# Modern approach: Kubernetes rolling deployment to AWS EKS with automated health checks
+#
+# Key Features:
+# - Automated rolling deployments to AWS EKS
+# - Zero-downtime updates with readiness/liveness probes
+# - Automated rollback on deployment failures
+# - Post-deployment smoke tests
+# - Support for production and staging environments
+# - Deployment approval gates for production
+
+name: CD Pipeline
+
+on:
+  # Trigger on successful CI pipeline completion
+  workflow_run:
+    workflows: ["CI Pipeline"]
+    types:
+      - completed
+    branches:
+      - main
+  
+  # Manual workflow dispatch with environment selection
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+        default: 'staging'
+      skip_tests:
+        description: 'Skip smoke tests'
+        required: false
+        type: boolean
+        default: false
+
+# Define environment variables
+env:
+  AWS_REGION: us-east-1
+  EKS_CLUSTER_NAME: carddemo-cluster
+  NAMESPACE: carddemo
+  DEPLOYMENT_NAME: carddemo
+  DOCKER_IMAGE_REPO: ${{ secrets.DOCKER_REGISTRY }}/carddemo
+  KUBECTL_VERSION: '1.28.0'
+
+# Permissions for OIDC token
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  # Determine deployment environment
+  determine-environment:
+    name: Determine Deployment Environment
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.set-env.outputs.environment }}
+      should_deploy: ${{ steps.check-ci.outputs.should_deploy }}
+    steps:
+      - name: Check CI Pipeline Status
+        id: check-ci
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            if [ "${{ github.event.workflow_run.conclusion }}" = "success" ]; then
+              echo "should_deploy=true" >> $GITHUB_OUTPUT
+              echo "✅ CI pipeline completed successfully"
+            else
+              echo "should_deploy=false" >> $GITHUB_OUTPUT
+              echo "❌ CI pipeline failed, skipping deployment"
+            fi
+          else
+            echo "should_deploy=true" >> $GITHUB_OUTPUT
+            echo "🔧 Manual deployment triggered"
+          fi
+      
+      - name: Set Deployment Environment
+        id: set-env
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+            echo "📦 Deploying to: ${{ github.event.inputs.environment }}"
+          elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "environment=staging" >> $GITHUB_OUTPUT
+            echo "📦 Deploying to: staging (auto-deploy from main branch)"
+          else
+            echo "environment=staging" >> $GITHUB_OUTPUT
+            echo "📦 Deploying to: staging (default)"
+          fi
+
+  # Deploy to staging environment
+  deploy-staging:
+    name: Deploy to Staging
+    needs: determine-environment
+    if: needs.determine-environment.outputs.should_deploy == 'true' && needs.determine-environment.outputs.environment == 'staging'
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://staging.carddemo.example.com
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_STAGING }}
+          role-session-name: github-actions-cd-staging
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: ${{ env.KUBECTL_VERSION }}
+      
+      - name: Configure kubectl for EKS
+        run: |
+          aws eks update-kubeconfig \
+            --region ${{ env.AWS_REGION }} \
+            --name ${{ env.EKS_CLUSTER_NAME }}-staging
+          
+          # Verify connection
+          kubectl cluster-info
+          kubectl get nodes
+      
+      - name: Verify Namespace Exists
+        run: |
+          if ! kubectl get namespace ${{ env.NAMESPACE }} > /dev/null 2>&1; then
+            echo "Creating namespace: ${{ env.NAMESPACE }}"
+            kubectl create namespace ${{ env.NAMESPACE }}
+          else
+            echo "Namespace ${{ env.NAMESPACE }} already exists"
+          fi
+      
+      - name: Deploy ConfigMap
+        run: |
+          echo "📋 Deploying ConfigMap..."
+          kubectl apply -f k8s/configmap.yml --namespace ${{ env.NAMESPACE }}
+          kubectl get configmap --namespace ${{ env.NAMESPACE }}
+      
+      - name: Deploy Secrets
+        run: |
+          echo "🔐 Deploying Secrets..."
+          kubectl apply -f k8s/secret.yml --namespace ${{ env.NAMESPACE }}
+          echo "Secrets deployed successfully"
+      
+      - name: Update Deployment Image Tag
+        run: |
+          # Use the commit SHA from the triggering CI workflow or current commit
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            IMAGE_TAG="${{ github.event.workflow_run.head_sha }}"
+          else
+            IMAGE_TAG="${{ github.sha }}"
+          fi
+          
+          echo "🏷️  Using image tag: $IMAGE_TAG"
+          
+          # Update the deployment manifest with the new image tag
+          sed -i "s|image: carddemo:latest|image: ${{ env.DOCKER_IMAGE_REPO }}:$IMAGE_TAG|g" k8s/deployment.yml
+          
+          cat k8s/deployment.yml | grep "image:"
+      
+      - name: Apply Kubernetes Deployment
+        run: |
+          echo "🚀 Deploying application to staging..."
+          kubectl apply -f k8s/deployment.yml --namespace ${{ env.NAMESPACE }}
+          kubectl apply -f k8s/service.yml --namespace ${{ env.NAMESPACE }}
+          kubectl apply -f k8s/ingress.yml --namespace ${{ env.NAMESPACE }}
+      
+      - name: Wait for Deployment Rollout
+        id: rollout
+        timeout-minutes: 10
+        run: |
+          echo "⏳ Waiting for deployment to complete..."
+          if kubectl rollout status deployment/${{ env.DEPLOYMENT_NAME }} \
+              --namespace ${{ env.NAMESPACE }} \
+              --timeout=10m; then
+            echo "✅ Deployment rollout completed successfully"
+            echo "rollout_status=success" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Deployment rollout failed"
+            echo "rollout_status=failed" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+      
+      - name: Verify Pod Health
+        run: |
+          echo "🏥 Verifying pod health..."
+          kubectl wait --for=condition=ready pod \
+            -l app=carddemo \
+            --namespace ${{ env.NAMESPACE }} \
+            --timeout=300s
+          
+          echo "📊 Pod status:"
+          kubectl get pods --namespace ${{ env.NAMESPACE }} -l app=carddemo
+          
+          echo "📝 Recent pod events:"
+          kubectl get events --namespace ${{ env.NAMESPACE }} --sort-by='.lastTimestamp' | tail -10
+      
+      - name: Run Smoke Tests
+        if: github.event.inputs.skip_tests != 'true'
+        timeout-minutes: 5
+        run: |
+          echo "🧪 Running smoke tests..."
+          
+          # Get the LoadBalancer URL
+          EXTERNAL_IP=$(kubectl get service carddemo-service \
+            --namespace ${{ env.NAMESPACE }} \
+            -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          
+          if [ -z "$EXTERNAL_IP" ]; then
+            echo "⚠️  LoadBalancer IP not yet assigned, using port-forward for testing"
+            kubectl port-forward service/carddemo-service 8080:8080 --namespace ${{ env.NAMESPACE }} &
+            PORT_FORWARD_PID=$!
+            sleep 5
+            BASE_URL="http://localhost:8080"
+          else
+            BASE_URL="http://$EXTERNAL_IP"
+          fi
+          
+          echo "Testing endpoint: $BASE_URL"
+          
+          # Test 1: Health check endpoint
+          echo "Test 1: Health check endpoint..."
+          HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" $BASE_URL/actuator/health)
+          if [ "$HEALTH_STATUS" = "200" ]; then
+            echo "✅ Health check passed (HTTP $HEALTH_STATUS)"
+          else
+            echo "❌ Health check failed (HTTP $HEALTH_STATUS)"
+            exit 1
+          fi
+          
+          # Test 2: Health check returns UP status
+          echo "Test 2: Health check status..."
+          HEALTH_RESPONSE=$(curl -s $BASE_URL/actuator/health)
+          if echo "$HEALTH_RESPONSE" | grep -q '"status":"UP"'; then
+            echo "✅ Application status is UP"
+          else
+            echo "❌ Application status is not UP"
+            echo "Response: $HEALTH_RESPONSE"
+            exit 1
+          fi
+          
+          # Test 3: Menu API endpoint (authentication not required for menu)
+          echo "Test 3: Menu API endpoint..."
+          MENU_STATUS=$(curl -s -o /dev/null -w "%{http_code}" $BASE_URL/api/v1/menu)
+          if [ "$MENU_STATUS" = "200" ] || [ "$MENU_STATUS" = "401" ]; then
+            echo "✅ Menu endpoint accessible (HTTP $MENU_STATUS)"
+          else
+            echo "❌ Menu endpoint failed (HTTP $MENU_STATUS)"
+            exit 1
+          fi
+          
+          # Test 4: Actuator info endpoint
+          echo "Test 4: Actuator info endpoint..."
+          INFO_STATUS=$(curl -s -o /dev/null -w "%{http_code}" $BASE_URL/actuator/info)
+          if [ "$INFO_STATUS" = "200" ]; then
+            echo "✅ Info endpoint accessible (HTTP $INFO_STATUS)"
+          else
+            echo "⚠️  Info endpoint returned HTTP $INFO_STATUS (non-critical)"
+          fi
+          
+          # Cleanup port-forward if used
+          if [ ! -z "$PORT_FORWARD_PID" ]; then
+            kill $PORT_FORWARD_PID 2>/dev/null || true
+          fi
+          
+          echo "🎉 All smoke tests passed!"
+      
+      - name: Rollback on Failure
+        if: failure() && steps.rollout.outputs.rollout_status == 'failed'
+        run: |
+          echo "🔄 Rolling back deployment due to failure..."
+          kubectl rollout undo deployment/${{ env.DEPLOYMENT_NAME }} \
+            --namespace ${{ env.NAMESPACE }}
+          
+          echo "⏳ Waiting for rollback to complete..."
+          kubectl rollout status deployment/${{ env.DEPLOYMENT_NAME }} \
+            --namespace ${{ env.NAMESPACE }} \
+            --timeout=5m
+          
+          echo "✅ Rollback completed"
+      
+      - name: Get Deployment Info
+        if: always()
+        run: |
+          echo "📊 Deployment Summary:"
+          echo "===================="
+          kubectl get deployment ${{ env.DEPLOYMENT_NAME }} --namespace ${{ env.NAMESPACE }}
+          echo ""
+          echo "Pod Details:"
+          kubectl get pods --namespace ${{ env.NAMESPACE }} -l app=carddemo -o wide
+          echo ""
+          echo "Service Details:"
+          kubectl get service --namespace ${{ env.NAMESPACE }}
+          echo ""
+          echo "Recent Events:"
+          kubectl get events --namespace ${{ env.NAMESPACE }} --sort-by='.lastTimestamp' | tail -20
+      
+      - name: Notify Deployment Success
+        if: success()
+        run: |
+          echo "✅ Deployment to staging completed successfully"
+          echo "Environment: staging"
+          echo "Namespace: ${{ env.NAMESPACE }}"
+          echo "Deployed at: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+          # Add Slack/email notification here if configured
+      
+      - name: Notify Deployment Failure
+        if: failure()
+        run: |
+          echo "❌ Deployment to staging failed"
+          echo "Environment: staging"
+          echo "Namespace: ${{ env.NAMESPACE }}"
+          echo "Failed at: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+          echo "Check logs above for details"
+          # Add Slack/email notification here if configured
+
+  # Deploy to production environment (with approval gate)
+  deploy-production:
+    name: Deploy to Production
+    needs: determine-environment
+    if: needs.determine-environment.outputs.should_deploy == 'true' && needs.determine-environment.outputs.environment == 'production'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://carddemo.example.com
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_PRODUCTION }}
+          role-session-name: github-actions-cd-production
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: ${{ env.KUBECTL_VERSION }}
+      
+      - name: Configure kubectl for EKS
+        run: |
+          aws eks update-kubeconfig \
+            --region ${{ env.AWS_REGION }} \
+            --name ${{ env.EKS_CLUSTER_NAME }}-production
+          
+          # Verify connection
+          kubectl cluster-info
+          kubectl get nodes
+      
+      - name: Verify Namespace Exists
+        run: |
+          if ! kubectl get namespace ${{ env.NAMESPACE }} > /dev/null 2>&1; then
+            echo "Creating namespace: ${{ env.NAMESPACE }}"
+            kubectl create namespace ${{ env.NAMESPACE }}
+          else
+            echo "Namespace ${{ env.NAMESPACE }} already exists"
+          fi
+      
+      - name: Deploy ConfigMap
+        run: |
+          echo "📋 Deploying ConfigMap..."
+          kubectl apply -f k8s/configmap.yml --namespace ${{ env.NAMESPACE }}
+          kubectl get configmap --namespace ${{ env.NAMESPACE }}
+      
+      - name: Deploy Secrets
+        run: |
+          echo "🔐 Deploying Secrets..."
+          kubectl apply -f k8s/secret.yml --namespace ${{ env.NAMESPACE }}
+          echo "Secrets deployed successfully"
+      
+      - name: Update Deployment Image Tag
+        run: |
+          # Use the commit SHA from the triggering CI workflow or current commit
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            IMAGE_TAG="${{ github.event.workflow_run.head_sha }}"
+          else
+            IMAGE_TAG="${{ github.sha }}"
+          fi
+          
+          echo "🏷️  Using image tag: $IMAGE_TAG"
+          
+          # Update the deployment manifest with the new image tag
+          sed -i "s|image: carddemo:latest|image: ${{ env.DOCKER_IMAGE_REPO }}:$IMAGE_TAG|g" k8s/deployment.yml
+          
+          cat k8s/deployment.yml | grep "image:"
+      
+      - name: Apply Kubernetes Deployment
+        run: |
+          echo "🚀 Deploying application to production..."
+          kubectl apply -f k8s/deployment.yml --namespace ${{ env.NAMESPACE }}
+          kubectl apply -f k8s/service.yml --namespace ${{ env.NAMESPACE }}
+          kubectl apply -f k8s/ingress.yml --namespace ${{ env.NAMESPACE }}
+      
+      - name: Wait for Deployment Rollout
+        id: rollout
+        timeout-minutes: 15
+        run: |
+          echo "⏳ Waiting for deployment to complete..."
+          if kubectl rollout status deployment/${{ env.DEPLOYMENT_NAME }} \
+              --namespace ${{ env.NAMESPACE }} \
+              --timeout=15m; then
+            echo "✅ Deployment rollout completed successfully"
+            echo "rollout_status=success" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Deployment rollout failed"
+            echo "rollout_status=failed" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+      
+      - name: Verify Pod Health
+        run: |
+          echo "🏥 Verifying pod health..."
+          kubectl wait --for=condition=ready pod \
+            -l app=carddemo \
+            --namespace ${{ env.NAMESPACE }} \
+            --timeout=300s
+          
+          echo "📊 Pod status:"
+          kubectl get pods --namespace ${{ env.NAMESPACE }} -l app=carddemo
+          
+          echo "📝 Recent pod events:"
+          kubectl get events --namespace ${{ env.NAMESPACE }} --sort-by='.lastTimestamp' | tail -10
+      
+      - name: Run Smoke Tests
+        if: github.event.inputs.skip_tests != 'true'
+        timeout-minutes: 5
+        run: |
+          echo "🧪 Running smoke tests..."
+          
+          # Get the LoadBalancer URL
+          EXTERNAL_IP=$(kubectl get service carddemo-service \
+            --namespace ${{ env.NAMESPACE }} \
+            -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          
+          if [ -z "$EXTERNAL_IP" ]; then
+            echo "❌ LoadBalancer IP not assigned"
+            exit 1
+          fi
+          
+          BASE_URL="https://carddemo.example.com"
+          echo "Testing endpoint: $BASE_URL"
+          
+          # Test 1: Health check endpoint
+          echo "Test 1: Health check endpoint..."
+          HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" $BASE_URL/actuator/health)
+          if [ "$HEALTH_STATUS" = "200" ]; then
+            echo "✅ Health check passed (HTTP $HEALTH_STATUS)"
+          else
+            echo "❌ Health check failed (HTTP $HEALTH_STATUS)"
+            exit 1
+          fi
+          
+          # Test 2: Health check returns UP status
+          echo "Test 2: Health check status..."
+          HEALTH_RESPONSE=$(curl -s $BASE_URL/actuator/health)
+          if echo "$HEALTH_RESPONSE" | grep -q '"status":"UP"'; then
+            echo "✅ Application status is UP"
+          else
+            echo "❌ Application status is not UP"
+            echo "Response: $HEALTH_RESPONSE"
+            exit 1
+          fi
+          
+          # Test 3: Database connectivity check
+          echo "Test 3: Database connectivity..."
+          if echo "$HEALTH_RESPONSE" | grep -q '"db":{"status":"UP"'; then
+            echo "✅ Database connection verified"
+          else
+            echo "❌ Database connection failed"
+            exit 1
+          fi
+          
+          # Test 4: Accounts API endpoint
+          echo "Test 4: Accounts API endpoint..."
+          ACCOUNTS_STATUS=$(curl -s -o /dev/null -w "%{http_code}" $BASE_URL/api/v1/accounts/1)
+          if [ "$ACCOUNTS_STATUS" = "200" ] || [ "$ACCOUNTS_STATUS" = "401" ]; then
+            echo "✅ Accounts endpoint accessible (HTTP $ACCOUNTS_STATUS)"
+          else
+            echo "❌ Accounts endpoint failed (HTTP $ACCOUNTS_STATUS)"
+            exit 1
+          fi
+          
+          echo "🎉 All smoke tests passed!"
+      
+      - name: Rollback on Failure
+        if: failure() && steps.rollout.outputs.rollout_status == 'failed'
+        run: |
+          echo "🔄 Rolling back deployment due to failure..."
+          kubectl rollout undo deployment/${{ env.DEPLOYMENT_NAME }} \
+            --namespace ${{ env.NAMESPACE }}
+          
+          echo "⏳ Waiting for rollback to complete..."
+          kubectl rollout status deployment/${{ env.DEPLOYMENT_NAME }} \
+            --namespace ${{ env.NAMESPACE }} \
+            --timeout=10m
+          
+          echo "✅ Rollback completed"
+          echo "⚠️  ALERT: Production deployment rolled back!"
+      
+      - name: Get Deployment Info
+        if: always()
+        run: |
+          echo "📊 Deployment Summary:"
+          echo "===================="
+          kubectl get deployment ${{ env.DEPLOYMENT_NAME }} --namespace ${{ env.NAMESPACE }}
+          echo ""
+          echo "Pod Details:"
+          kubectl get pods --namespace ${{ env.NAMESPACE }} -l app=carddemo -o wide
+          echo ""
+          echo "Service Details:"
+          kubectl get service --namespace ${{ env.NAMESPACE }}
+          echo ""
+          echo "Ingress Details:"
+          kubectl get ingress --namespace ${{ env.NAMESPACE }}
+          echo ""
+          echo "Recent Events:"
+          kubectl get events --namespace ${{ env.NAMESPACE }} --sort-by='.lastTimestamp' | tail -20
+      
+      - name: Tag Release
+        if: success()
+        run: |
+          # Create a git tag for the production release
+          BUILD_NUMBER="${{ github.run_number }}"
+          TAG_NAME="v1.0.$BUILD_NUMBER"
+          
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG_NAME" -m "Production release $TAG_NAME"
+          git push origin "$TAG_NAME"
+          
+          echo "🏷️  Created release tag: $TAG_NAME"
+      
+      - name: Notify Deployment Success
+        if: success()
+        run: |
+          echo "🎉 =================================="
+          echo "✅ PRODUCTION DEPLOYMENT SUCCESSFUL"
+          echo "===================================="
+          echo "Environment: production"
+          echo "Namespace: ${{ env.NAMESPACE }}"
+          echo "Deployed at: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+          echo "Release tag: v1.0.${{ github.run_number }}"
+          echo "URL: https://carddemo.example.com"
+          # Add Slack/email notification here if configured
+      
+      - name: Notify Deployment Failure
+        if: failure()
+        run: |
+          echo "❌ =============================="
+          echo "⚠️  PRODUCTION DEPLOYMENT FAILED"
+          echo "================================="
+          echo "Environment: production"
+          echo "Namespace: ${{ env.NAMESPACE }}"
+          echo "Failed at: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+          echo "Check logs above for details"
+          echo "ROLLBACK MAY HAVE BEEN EXECUTED"
+          # Add Slack/email notification here if configured
+          # CRITICAL: Alert on-call engineer
