@@ -78,12 +78,15 @@ public class Account extends BaseEntity implements Serializable {
      * 
      * COBOL Mapping: ACCT-ID PIC 9(11)
      * Validation: Exactly 11 digits, unique across all accounts
+     * 
+     * NOTE: NOT included in equals()/hashCode() - JPA entities with surrogate keys
+     * should use only the @Id field (accountId) for equality. This prevents
+     * Hibernate session cache issues and conforms to JPA entity equality contract.
      */
     @Column(name = "account_number", nullable = false, length = 11, unique = true)
     @NotNull(message = "Account number is required")
     @Size(min = 11, max = 11, message = "Account number must be exactly 11 digits")
     @Pattern(regexp = "\\d{11}", message = "Account number must contain only digits")
-    @EqualsAndHashCode.Include
     private String accountNumber;
 
     /**
