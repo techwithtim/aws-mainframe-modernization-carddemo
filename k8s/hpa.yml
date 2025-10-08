@@ -1,0 +1,167 @@
+# Kubernetes HorizontalPodAutoscaler (HPA) for AWS CardDemo Modernized Application
+# 
+# This HPA enables automatic scaling of the CardDemo application based on CPU and memory metrics,
+# ensuring the application can handle variable load while optimizing resource costs.
+#
+# Key Features:
+# - Automatic scaling between 3-10 replicas based on observed resource utilization
+# - CPU-based scaling with 70% target utilization threshold
+# - Memory-based scaling with 80% target utilization threshold
+# - Stabilization windows to prevent flapping during scale operations
+# - Supports 1,000+ concurrent users at peak load (10 replicas)
+#
+# Migration Context:
+# - Replaces mainframe capacity planning with cloud-native auto-scaling
+# - Enables elastic capacity to match the dynamic load patterns that CICS regions handled statically
+# - Implements horizontal scaling pattern per Technical Specification 5.1
+#
+# Prerequisites:
+# - Kubernetes Metrics Server must be installed and running in the cluster
+# - Deployment 'carddemo' must exist in the 'carddemo' namespace
+# - Pod resource requests must be defined for CPU and memory (used as baseline for percentage calculations)
+#
+# References:
+# - Agent Action Plan 0.1.2: Performance & Scalability Improvements
+# - Agent Action Plan 0.8.6: Performance Baseline Requirements (1,000+ concurrent users)
+# - Technical Specification 5.1: High-Level Architecture (HPA configuration)
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: carddemo-hpa
+  namespace: carddemo
+  labels:
+    app: carddemo
+    component: autoscaler
+    environment: production
+  annotations:
+    description: "Auto-scales CardDemo application pods based on CPU and memory utilization"
+    migration-source: "Replaces mainframe CICS region capacity planning"
+
+spec:
+  # Target deployment to scale
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: carddemo
+
+  # Minimum replicas: 3 (baseline high availability)
+  # Ensures fault tolerance and load distribution even during low traffic periods
+  # Matches the initial deployment replica count for consistency
+  minReplicas: 3
+
+  # Maximum replicas: 10 (peak capacity)
+  # Supports 1,000+ concurrent users per performance baseline requirements
+  # Each replica can handle approximately 100-150 concurrent users with <200ms response times
+  maxReplicas: 10
+
+  # Scaling metrics configuration
+  metrics:
+    # CPU-based scaling metric
+    # Target: 70% average CPU utilization across all pods
+    # Scale up when average CPU exceeds 70%, scale down when below 70%
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          # 70% target per Technical Specification 5.1
+          # Conservative threshold allows headroom for traffic spikes
+          averageUtilization: 70
+
+    # Memory-based scaling metric
+    # Target: 80% average memory utilization across all pods
+    # Particularly important for batch processing operations (Spring Batch jobs)
+    # and caching of reference data (transaction types, categories)
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          # 80% target for memory-intensive operations
+          # Higher than CPU threshold as memory usage is more predictable
+          averageUtilization: 80
+
+  # Scaling behavior configuration
+  # Controls the rate and stability of scaling operations
+  behavior:
+    # Scale-up behavior
+    scaleUp:
+      # Stabilization window: 60 seconds
+      # HPA will look at the last 60 seconds of metrics before deciding to scale up
+      # Prevents premature scaling due to temporary traffic spikes
+      stabilizationWindowSeconds: 60
+      
+      # Scale-up policies
+      policies:
+        # Allow adding up to 4 pods per minute (aggressive scale-up for traffic spikes)
+        - type: Pods
+          value: 4
+          periodSeconds: 60
+        
+        # Allow increasing by 100% of current pods per minute (doubles capacity quickly)
+        - type: Percent
+          value: 100
+          periodSeconds: 60
+      
+      # Use the policy that allows the most aggressive scale-up (max policy)
+      selectPolicy: Max
+
+    # Scale-down behavior
+    scaleDown:
+      # Stabilization window: 300 seconds (5 minutes)
+      # Longer stabilization for scale-down to avoid flapping
+      # Ensures sustained low utilization before removing capacity
+      stabilizationWindowSeconds: 300
+      
+      # Scale-down policies
+      policies:
+        # Remove at most 1 pod per 60 seconds (conservative scale-down)
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+        
+        # Reduce by at most 10% of current pods per minute (gradual capacity reduction)
+        - type: Percent
+          value: 10
+          periodSeconds: 60
+      
+      # Use the policy that results in the slowest scale-down (min policy)
+      # Prioritizes stability over cost optimization
+      selectPolicy: Min
+
+---
+# Additional Notes for Operations:
+#
+# Monitoring HPA Status:
+#   kubectl get hpa carddemo-hpa -n carddemo
+#   kubectl describe hpa carddemo-hpa -n carddemo
+#
+# View Current Metrics:
+#   kubectl top pods -n carddemo -l app=carddemo
+#
+# Testing Auto-Scaling:
+#   # Generate load to trigger scale-up
+#   kubectl run -i --tty load-generator --rm --image=busybox --restart=Never -- /bin/sh
+#   # Inside the pod, run: while true; do wget -q -O- http://carddemo-service:8080/actuator/health; done
+#
+# Expected Behavior:
+#   - At 70% CPU or 80% memory: HPA begins scaling up
+#   - Scale-up completes within 60 seconds of sustained high utilization
+#   - Scale-down occurs after 300 seconds of sustained low utilization
+#   - Replicas never drop below 3 or exceed 10
+#
+# Integration with Deployment:
+#   - Deployment must define resource requests (used for percentage calculations)
+#   - Example: requests: {memory: "512Mi", cpu: "500m"}
+#   - HPA calculates: current_utilization = (current_usage / requested_resources) * 100
+#
+# Cost Optimization:
+#   - Minimum 3 replicas ensure availability with reasonable baseline cost
+#   - Maximum 10 replicas cap peak costs while meeting performance SLOs
+#   - Automatic scale-down during off-peak hours reduces unnecessary resource consumption
+#
+# Performance Validation:
+#   - Monitor response times during scaling events
+#   - Ensure <200ms API response times are maintained at all replica counts
+#   - Validate batch job performance is not impacted by scaling operations
