@@ -133,8 +133,9 @@ public class WebConfig implements WebMvcConfigurer {
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/api/**")
                 // Allow all origins in development
-                // TODO: In production, replace with specific domains:
-                // .allowedOrigins("https://carddemo.example.com", "https://admin.carddemo.example.com")
+                // SECURITY NOTE: In production, restrict to specific domains via application-prod.yml:
+                // cors.allowed-origins=https://carddemo.example.com,https://admin.carddemo.example.com
+                // For production: .allowedOrigins("https://carddemo.example.com", "https://admin.carddemo.example.com")
                 .allowedOriginPatterns("*")
                 
                 // Allow standard HTTP methods for REST CRUD operations
