@@ -166,7 +166,7 @@ import java.util.List;
     }
 )
 @Data
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @ToString(callSuper = true)
 @NoArgsConstructor
 @AllArgsConstructor
@@ -200,6 +200,7 @@ public class Customer extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "customer_id", nullable = false)
+    @EqualsAndHashCode.Include
     private Long customerId;
 
     /**
@@ -717,8 +718,8 @@ public class Customer extends BaseEntity {
      */
     @Transient
     public String getSsnMasked() {
-        if (ssn == null || ssn.length() < 5) {
-            return ssn != null ? "*****" : null;
+        if (ssn == null || ssn.length() != 9) {
+            return "*********";
         }
         return "*****" + ssn.substring(5);
     }
