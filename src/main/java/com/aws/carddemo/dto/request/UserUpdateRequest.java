@@ -5,6 +5,7 @@
 
 package com.aws.carddemo.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -191,6 +192,7 @@ public class UserUpdateRequest {
      * 
      * @return true if passwords match or if password is not provided, false otherwise
      */
+    @JsonIgnore
     public boolean isPasswordConfirmed() {
         if (password == null || password.isEmpty()) {
             // No password change requested, confirmation not required
@@ -205,6 +207,7 @@ public class UserUpdateRequest {
      * 
      * @return true if password field is non-null and non-empty
      */
+    @JsonIgnore
     public boolean hasPasswordChange() {
         return password != null && !password.isEmpty();
     }
