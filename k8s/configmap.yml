@@ -1,0 +1,358 @@
+#
+# Kubernetes ConfigMap for AWS CardDemo Modernized Application
+# 
+# Purpose: Externalize non-sensitive application configuration enabling
+# environment-specific deployment without application code changes per
+# 12-Factor App methodology and Agent Action Plan section 0.1.2.
+#
+# Security: This ConfigMap contains ONLY non-sensitive configuration values.
+# Sensitive credentials (database username, password) are stored in 
+# k8s/secret.yml as Sealed Secrets per PCI-DSS requirements.
+#
+# Deployment: Applied to carddemo namespace via kubectl apply -f k8s/configmap.yml
+# Referenced by k8s/deployment.yml via envFrom.configMapRef for environment injection.
+#
+# Migration Context: Replaces mainframe JCL DD statements and CICS system
+# initialization parameters with cloud-native externalized configuration.
+#
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: carddemo-config
+  namespace: carddemo
+  labels:
+    app: carddemo
+    component: configuration
+    version: v1.0.0
+  annotations:
+    description: "Application configuration for CardDemo modernized Java 21 application"
+    documentation: "https://github.com/aws-samples/aws-card-demo-modernized/docs/deployment-guide.md"
+
+data:
+  # =============================================================================
+  # DATABASE CONNECTION CONFIGURATION
+  # =============================================================================
+  # PostgreSQL RDS endpoint and connection parameters
+  # These values are injected into Spring Boot's DataSource configuration
+  # via application.yml: spring.datasource.url=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+  
+  # Database host: AWS RDS PostgreSQL endpoint (Multi-AZ for high availability)
+  # Production value should be the actual RDS cluster endpoint from Terraform output
+  # Example: carddemo-db.cluster-xxxxx.us-east-1.rds.amazonaws.com
+  DB_HOST: "carddemo-db.cluster-xxxxx.us-east-1.rds.amazonaws.com"
+  
+  # PostgreSQL standard port (5432)
+  DB_PORT: "5432"
+  
+  # Database name created by Flyway migrations
+  DB_NAME: "carddemo"
+  
+  # =============================================================================
+  # HIKARICP CONNECTION POOL CONFIGURATION
+  # =============================================================================
+  # HikariCP is the default connection pool in Spring Boot 3.x
+  # Configuration per Technical Specification section 6.2.1.1
+  
+  # Maximum number of connections per pod (20 connections × 3 pods = 60 baseline connections)
+  # Supports 50-100 concurrent HTTP requests per pod with typical 20-50ms query execution times
+  # PostgreSQL max_connections must accommodate peak load: 10 pods × 20 = 200 connections
+  HIKARI_MAX_POOL_SIZE: "20"
+  
+  # Minimum idle connections maintained in pool for warm availability
+  # Eliminates ~10ms connection establishment latency for initial requests after idle periods
+  HIKARI_MIN_IDLE: "5"
+  
+  # Connection timeout in milliseconds (30 seconds)
+  # Prevents indefinite blocking during database saturation, enables fail-fast patterns
+  HIKARI_CONNECTION_TIMEOUT: "30000"
+  
+  # Idle timeout in milliseconds (10 minutes = 600,000ms)
+  # Connections idle longer than this are removed from pool during low-traffic periods
+  HIKARI_IDLE_TIMEOUT: "600000"
+  
+  # Maximum lifetime of a connection in milliseconds (30 minutes = 1,800,000ms)
+  # Forces connection refresh to prevent stale connections and handle DNS changes
+  HIKARI_MAX_LIFETIME: "1800000"
+  
+  # Connection leak detection threshold in milliseconds (60 seconds)
+  # Logs warning if connection held longer than threshold, identifies connection leak bugs
+  HIKARI_LEAK_DETECTION_THRESHOLD: "60000"
+  
+  # =============================================================================
+  # SPRING BOOT PROFILE CONFIGURATION
+  # =============================================================================
+  # Active Spring profile determines which application-{profile}.yml is loaded
+  # Profiles: dev (local development), test (CI/CD pipeline), prod (production EKS)
+  
+  SPRING_PROFILES_ACTIVE: "prod"
+  
+  # =============================================================================
+  # SERVER CONFIGURATION
+  # =============================================================================
+  # Embedded Tomcat server configuration
+  
+  # HTTP server port (container internal port, mapped to 8080 in Service)
+  SERVER_PORT: "8080"
+  
+  # Context path (root path for all API endpoints)
+  # All endpoints accessible at http://service:8080/api/v1/*
+  SERVER_SERVLET_CONTEXT_PATH: "/"
+  
+  # Tomcat connection timeout in milliseconds (20 seconds)
+  # Closes idle connections to free resources during high-concurrency scenarios
+  SERVER_CONNECTION_TIMEOUT: "20000"
+  
+  # Maximum HTTP threads in Tomcat (200 threads)
+  # Supports 1,000+ concurrent users per Agent Action Plan performance requirements
+  SERVER_TOMCAT_MAX_THREADS: "200"
+  
+  # Minimum HTTP threads in Tomcat (10 threads)
+  # Warm thread pool for immediate request handling
+  SERVER_TOMCAT_MIN_SPARE_THREADS: "10"
+  
+  # =============================================================================
+  # JPA/HIBERNATE CONFIGURATION
+  # =============================================================================
+  # Java Persistence API and Hibernate ORM settings
+  
+  # DDL auto mode: validate (never auto-generate schema, only validate against existing)
+  # Schema is managed exclusively by Flyway versioned migrations (V1__create_tables.sql, etc.)
+  # Prevents accidental schema changes in production environment
+  HIBERNATE_DDL_AUTO: "validate"
+  
+  # Hibernate SQL dialect for PostgreSQL-specific optimizations
+  # Enables PostgreSQL features: JSONB, array types, window functions, CTEs
+  HIBERNATE_DIALECT: "org.hibernate.dialect.PostgreSQLDialect"
+  
+  # Show SQL in logs (false for production to reduce log volume)
+  # Enable in dev/test profiles for debugging query generation
+  HIBERNATE_SHOW_SQL: "false"
+  
+  # Format SQL for readability when logged (false for production)
+  HIBERNATE_FORMAT_SQL: "false"
+  
+  # JDBC batch size for bulk operations (50 statements per batch)
+  # Optimizes Spring Batch transaction posting with reduced database round-trips
+  HIBERNATE_JDBC_BATCH_SIZE: "50"
+  
+  # =============================================================================
+  # SPRING BATCH CONFIGURATION
+  # =============================================================================
+  # Spring Batch job execution settings
+  
+  # Disable automatic job execution on application startup (false)
+  # Batch jobs triggered on-demand via REST API or Kubernetes CronJob
+  # Prevents unintended batch execution during pod restarts
+  SPRING_BATCH_JOB_ENABLED: "false"
+  
+  # JDBC initialize schema mode for Spring Batch metadata tables
+  # Value: always (creates batch tables if not exist: batch_job_execution, batch_step_execution)
+  SPRING_BATCH_JDBC_INITIALIZE_SCHEMA: "always"
+  
+  # =============================================================================
+  # FLYWAY DATABASE MIGRATION CONFIGURATION
+  # =============================================================================
+  # Flyway versioned migration settings
+  
+  # Enable Flyway migrations on startup (true)
+  # Applies pending migrations from src/main/resources/db/migration/
+  FLYWAY_ENABLED: "true"
+  
+  # Baseline version for existing databases (1.0)
+  # Initial version when applying Flyway to pre-existing database
+  FLYWAY_BASELINE_VERSION: "1.0"
+  
+  # Baseline on migrate for existing databases (true)
+  # Allows Flyway to manage schema evolution from current state
+  FLYWAY_BASELINE_ON_MIGRATE: "true"
+  
+  # Validate migrations on startup (true)
+  # Ensures all applied migrations match expected checksums, detects manual schema changes
+  FLYWAY_VALIDATE_ON_MIGRATE: "true"
+  
+  # =============================================================================
+  # LOGGING CONFIGURATION
+  # =============================================================================
+  # Logback logging levels for application packages
+  
+  # Root logging level (INFO for production, DEBUG for dev/test)
+  LOGGING_LEVEL_ROOT: "INFO"
+  
+  # Application package logging level (INFO for production)
+  # Set to DEBUG in dev profile for detailed application flow tracing
+  LOGGING_LEVEL_COM_AWS_CARDDEMO: "INFO"
+  
+  # Spring Framework logging level (INFO)
+  # Reduces verbose Spring startup and lifecycle logs in production
+  LOGGING_LEVEL_ORG_SPRINGFRAMEWORK: "INFO"
+  
+  # Hibernate logging level (WARN)
+  # Suppresses verbose Hibernate entity loading and caching logs
+  LOGGING_LEVEL_ORG_HIBERNATE: "WARN"
+  
+  # SQL logging level (WARN)
+  # Set to DEBUG in dev profile to see generated SQL statements
+  LOGGING_LEVEL_ORG_HIBERNATE_SQL: "WARN"
+  
+  # HikariCP connection pool logging (INFO)
+  # Logs pool statistics and connection lifecycle events
+  LOGGING_LEVEL_COM_ZAXXER_HIKARI: "INFO"
+  
+  # =============================================================================
+  # SPRING ACTUATOR CONFIGURATION
+  # =============================================================================
+  # Actuator endpoints for health checks, metrics, and monitoring
+  
+  # Expose actuator endpoints (health, info, metrics, prometheus)
+  # Kubernetes liveness/readiness probes use /actuator/health
+  # Prometheus metrics scraping uses /actuator/prometheus
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info,metrics,prometheus"
+  
+  # Health endpoint shows detailed component status (true)
+  # Exposes database connectivity, disk space, custom health indicators
+  MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS: "always"
+  
+  # Enable Prometheus metrics export (true)
+  # Publishes Micrometer metrics in Prometheus format for monitoring
+  MANAGEMENT_METRICS_EXPORT_PROMETHEUS_ENABLED: "true"
+  
+  # =============================================================================
+  # APPLICATION-SPECIFIC CONFIGURATION
+  # =============================================================================
+  # CardDemo business logic configuration
+  
+  # JWT token expiration in milliseconds (1 hour = 3,600,000ms)
+  # User session timeout per security requirements
+  JWT_EXPIRATION_MS: "3600000"
+  
+  # Maximum failed login attempts before account lockout (5 attempts)
+  # Brute-force attack mitigation per Agent Action Plan security requirements
+  SECURITY_MAX_FAILED_LOGIN_ATTEMPTS: "5"
+  
+  # Account lockout duration in minutes (30 minutes)
+  # Time period before locked account can attempt login again
+  SECURITY_LOCKOUT_DURATION_MINUTES: "30"
+  
+  # API response pagination default page size (20 records)
+  # Used by transaction list, account list, and other paginated endpoints
+  API_PAGINATION_DEFAULT_SIZE: "20"
+  
+  # API response pagination maximum page size (100 records)
+  # Prevents excessive memory consumption from large page requests
+  API_PAGINATION_MAX_SIZE: "100"
+  
+  # Transaction batch chunk size for Spring Batch processing (100 records)
+  # Chunk-oriented processing commit interval for daily transaction posting
+  BATCH_TRANSACTION_CHUNK_SIZE: "100"
+  
+  # Interest calculation batch chunk size (50 accounts)
+  # Chunk-oriented processing for interest calculation job
+  BATCH_INTEREST_CHUNK_SIZE: "50"
+  
+  # Statement generation batch chunk size (25 accounts)
+  # Chunk-oriented processing for monthly statement generation
+  BATCH_STATEMENT_CHUNK_SIZE: "25"
+  
+  # =============================================================================
+  # CORS CONFIGURATION
+  # =============================================================================
+  # Cross-Origin Resource Sharing settings for frontend integration
+  
+  # Allowed origins for CORS (comma-separated list)
+  # Update with actual frontend domain(s) in production
+  # Example: https://carddemo.example.com,https://www.carddemo.example.com
+  CORS_ALLOWED_ORIGINS: "https://carddemo.example.com"
+  
+  # Allowed HTTP methods for CORS
+  CORS_ALLOWED_METHODS: "GET,POST,PUT,DELETE,OPTIONS"
+  
+  # Allowed headers for CORS
+  CORS_ALLOWED_HEADERS: "Authorization,Content-Type,Accept,Origin,X-Requested-With"
+  
+  # Allow credentials in CORS requests (true for cookie-based auth)
+  CORS_ALLOW_CREDENTIALS: "true"
+  
+  # CORS preflight request cache duration in seconds (1 hour)
+  CORS_MAX_AGE: "3600"
+  
+  # =============================================================================
+  # CACHE CONFIGURATION
+  # =============================================================================
+  # Spring Cache configuration for reference data caching
+  
+  # Cache provider type (caffeine for in-memory caching)
+  SPRING_CACHE_TYPE: "caffeine"
+  
+  # Caffeine cache specifications
+  # Format: maximumSize=<size>,expireAfterWrite=<duration>
+  # Reference data caches (transaction types, categories) with 1-hour expiration
+  CACHE_SPEC_TRANSACTION_TYPES: "maximumSize=100,expireAfterWrite=1h"
+  CACHE_SPEC_TRANSACTION_CATEGORIES: "maximumSize=500,expireAfterWrite=1h"
+  CACHE_SPEC_DISCLOSURE_GROUPS: "maximumSize=200,expireAfterWrite=1h"
+  
+  # =============================================================================
+  # TIMEZONE CONFIGURATION
+  # =============================================================================
+  # Application timezone settings
+  
+  # JVM timezone (UTC for consistent timestamp handling across all pods)
+  TZ: "UTC"
+  
+  # Spring Jackson timezone for JSON serialization (UTC)
+  SPRING_JACKSON_TIME_ZONE: "UTC"
+  
+  # Spring Jackson date format for JSON serialization (ISO 8601)
+  SPRING_JACKSON_DATE_FORMAT: "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
+  
+  # =============================================================================
+  # PERFORMANCE TUNING
+  # =============================================================================
+  # JVM and application performance optimization settings
+  
+  # JVM heap size minimum (512 MB)
+  # Matches Kubernetes resource request for predictable memory allocation
+  JAVA_OPTS_XMS: "512m"
+  
+  # JVM heap size maximum (1 GB)
+  # Matches Kubernetes resource limit to prevent OOM kills
+  JAVA_OPTS_XMX: "1g"
+  
+  # JVM garbage collector (G1GC for low-latency, high-throughput)
+  # Optimized for sub-200ms API response time requirements
+  JAVA_OPTS_GC: "-XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+  
+  # =============================================================================
+  # OPENAPI/SWAGGER CONFIGURATION
+  # =============================================================================
+  # API documentation settings (Swagger UI)
+  
+  # Enable Swagger UI endpoint (true for production visibility)
+  SPRINGDOC_SWAGGER_UI_ENABLED: "true"
+  
+  # Swagger UI path (accessible at /swagger-ui.html)
+  SPRINGDOC_SWAGGER_UI_PATH: "/swagger-ui.html"
+  
+  # OpenAPI documentation path (accessible at /v3/api-docs)
+  SPRINGDOC_API_DOCS_PATH: "/v3/api-docs"
+  
+  # OpenAPI server URL (update with actual load balancer URL)
+  SPRINGDOC_SERVER_URL: "https://api.carddemo.example.com"
+  
+  # =============================================================================
+  # END OF CONFIGURATION
+  # =============================================================================
+  # All sensitive values (DB_USER, DB_PASS, JWT_SECRET) are stored in
+  # k8s/secret.yml as Sealed Secrets and injected separately into pods.
+  #
+  # Configuration validation: All values are strings per Kubernetes ConfigMap spec.
+  # Non-string values converted to string representation (e.g., "20" for max pool size).
+  #
+  # Deployment reference: k8s/deployment.yml references this ConfigMap via:
+  #   envFrom:
+  #     - configMapRef:
+  #         name: carddemo-config
+  #
+  # Update procedure: Modify values in this file, apply via kubectl, and restart pods:
+  #   kubectl apply -f k8s/configmap.yml
+  #   kubectl rollout restart deployment/carddemo -n carddemo
