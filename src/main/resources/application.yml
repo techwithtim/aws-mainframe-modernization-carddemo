@@ -115,9 +115,10 @@ spring:
         # Use SQL comments in generated queries for debugging
         use_sql_comments: false
         
-        # JDBC batch size for bulk operations (improves performance)
+        # JDBC configuration for batch operations and time zone
         jdbc:
           batch_size: 50
+          time_zone: UTC
           
         # Default batch fetch size for collections
         default_batch_fetch_size: 10
@@ -128,6 +129,11 @@ spring:
           use_query_cache: true
           region:
             factory_class: org.hibernate.cache.jcache.JCacheRegionFactory
+          jcache:
+            # Specify Caffeine as the JCache provider
+            provider: com.github.benmanes.caffeine.jcache.spi.CaffeineCachingProvider
+            # Use default cache configuration (1000 entries, 1 hour TTL)
+            missing_cache_strategy: create
         
         # Statistics collection for performance monitoring (disable in production)
         generate_statistics: false
@@ -135,10 +141,6 @@ spring:
         # Order SQL inserts for better batching performance
         order_inserts: true
         order_updates: true
-        
-        # JDBC time zone configuration
-        jdbc:
-          time_zone: UTC
   
   # ----------------------------------------------------------------------------
   # Spring Batch Configuration
@@ -245,6 +247,41 @@ spring:
     resources:
       # Disable default Spring Boot error page (use custom error handling)
       add-mappings: false
+  
+  # ----------------------------------------------------------------------------
+  # Spring Profiles
+  # ----------------------------------------------------------------------------
+  # Active profiles configuration (injected from environment)
+  # Supported profiles: dev, test, prod
+  # ----------------------------------------------------------------------------
+  profiles:
+    # Default active profile (overridden by SPRING_PROFILES_ACTIVE env var)
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+    
+    # Allow profile-specific property files to add configuration
+    include: []
+  
+  # ----------------------------------------------------------------------------
+  # Message Source Configuration (Internationalization)
+  # ----------------------------------------------------------------------------
+  # Message bundles for error messages and user-facing text.
+  # Messages defined in messages.properties and messages_en.properties.
+  # ----------------------------------------------------------------------------
+  messages:
+    # Base name for message bundles
+    basename: messages
+    
+    # Message bundle encoding
+    encoding: UTF-8
+    
+    # Cache duration for message bundles (-1 = cache forever)
+    cache-duration: -1
+    
+    # Fallback to system locale if message not found
+    fallback-to-system-locale: true
+    
+    # Use code as default message if message not found
+    use-code-as-default-message: false
 
 # ------------------------------------------------------------------------------
 # Server Configuration
@@ -568,20 +605,6 @@ carddemo:
       log-responses: false  # Prevent sensitive data in response logs
 
 # ------------------------------------------------------------------------------
-# Spring Profiles
-# ------------------------------------------------------------------------------
-# Active profiles configuration (injected from environment)
-# Supported profiles: dev, test, prod
-# ------------------------------------------------------------------------------
-spring:
-  profiles:
-    # Default active profile (overridden by SPRING_PROFILES_ACTIVE env var)
-    active: ${SPRING_PROFILES_ACTIVE:dev}
-    
-    # Allow profile-specific property files to add configuration
-    include: []
-
-# ------------------------------------------------------------------------------
 # API Documentation Configuration (Swagger/OpenAPI)
 # ------------------------------------------------------------------------------
 # OpenAPI 3.0 documentation for REST API endpoints.
@@ -606,29 +629,6 @@ springdoc:
   
   # Paths to include in documentation
   paths-to-match: /api/**
-
-# ------------------------------------------------------------------------------
-# Message Source Configuration (Internationalization)
-# ------------------------------------------------------------------------------
-# Message bundles for error messages and user-facing text.
-# Messages defined in messages.properties and messages_en.properties.
-# ------------------------------------------------------------------------------
-spring:
-  messages:
-    # Base name for message bundles
-    basename: messages
-    
-    # Message bundle encoding
-    encoding: UTF-8
-    
-    # Cache duration for message bundles (-1 = cache forever)
-    cache-duration: -1
-    
-    # Fallback to system locale if message not found
-    fallback-to-system-locale: true
-    
-    # Use code as default message if message not found
-    use-code-as-default-message: false
 
 # ------------------------------------------------------------------------------
 # END OF CONFIGURATION
