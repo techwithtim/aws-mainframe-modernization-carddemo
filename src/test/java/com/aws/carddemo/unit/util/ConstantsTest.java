@@ -59,7 +59,7 @@ class ConstantsTest {
                 .isNotNull()
                 .isNotEmpty()
                 .isEqualTo("AWS Mainframe Modernization")
-                .doesNotContainWhitespace(); // Trimmed version of COBOL constant
+                .contains("AWS", "Mainframe", "Modernization");
     }
 
     @Test
@@ -355,8 +355,9 @@ class ConstantsTest {
             constructor.setAccessible(true);
             constructor.newInstance();
         })
+                .isInstanceOf(java.lang.reflect.InvocationTargetException.class)
                 .hasCauseInstanceOf(UnsupportedOperationException.class)
-                .hasMessageContaining("Constants is a utility class and cannot be instantiated");
+                .hasRootCauseMessage("Constants is a utility class and cannot be instantiated");
     }
 
     // ==================== Integration and Cross-Validation Tests ====================
