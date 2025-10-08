@@ -1,0 +1,490 @@
+# ==============================================================================
+# AWS CardDemo Modernized - Production Configuration Profile
+# ==============================================================================
+# This configuration file is designed for production deployment on AWS EKS with
+# AWS RDS PostgreSQL. All sensitive values are externalized via Kubernetes
+# ConfigMaps and Secrets for secure configuration management.
+#
+# Environment Variables Required (injected via Kubernetes):
+#   DB_HOST: RDS PostgreSQL endpoint
+#   DB_PORT: Database port (default: 5432)
+#   DB_NAME: Database name (default: carddemo)
+#   DB_USER: Database username (from Secret)
+#   DB_PASS: Database password (from Secret)
+#   JWT_SECRET: JWT signing secret (from Secret)
+#   HIKARI_MAX_POOL_SIZE: Maximum connection pool size (default: 20)
+#
+# Migrated from: COBOL/CICS/VSAM mainframe architecture
+# Reference: Section 0.3 Target Design - Configuration & Deployment Architecture
+# ==============================================================================
+
+spring:
+  # ==============================================================================
+  # Application Identity
+  # ==============================================================================
+  application:
+    name: carddemo-modernized
+  
+  # ==============================================================================
+  # Production Profile Indicator
+  # ==============================================================================
+  profiles:
+    active: prod
+  
+  # ==============================================================================
+  # Database Configuration - AWS RDS PostgreSQL
+  # ==============================================================================
+  # Replaces: VSAM KSDS/AIX file structures from mainframe
+  # Connection: AWS RDS PostgreSQL with SSL/TLS enforcement
+  # ==============================================================================
+  datasource:
+    # JDBC URL with environment variable substitution
+    # SSL mode required for PCI-DSS compliance
+    url: jdbc:postgresql://${DB_HOST:carddemo-db.cluster-xxxxx.us-east-1.rds.amazonaws.com}:${DB_PORT:5432}/${DB_NAME:carddemo}?sslmode=require&ssl=true&sslrootcert=rds-combined-ca-bundle.pem
+    
+    # Database credentials injected from Kubernetes Secret
+    username: ${DB_USER}
+    password: ${DB_PASS}
+    
+    # PostgreSQL JDBC driver
+    driver-class-name: org.postgresql.Driver
+    
+    # ==============================================================================
+    # HikariCP Connection Pool Configuration
+    # ==============================================================================
+    # Optimized for production workload: 1,000+ concurrent users
+    # Connection pooling replaces CICS MRO connection management
+    # ==============================================================================
+    hikari:
+      # Maximum pool size - supports high concurrency
+      maximum-pool-size: ${HIKARI_MAX_POOL_SIZE:20}
+      
+      # Minimum idle connections - maintain baseline capacity
+      minimum-idle: 5
+      
+      # Connection timeout (30 seconds)
+      connection-timeout: 30000
+      
+      # Idle timeout (10 minutes)
+      idle-timeout: 600000
+      
+      # Maximum lifetime of connection (30 minutes)
+      max-lifetime: 1800000
+      
+      # Connection test query
+      connection-test-query: SELECT 1
+      
+      # Pool name for monitoring
+      pool-name: CardDemoHikariPool
+      
+      # Auto-commit disabled for explicit transaction control
+      auto-commit: false
+      
+      # Leak detection threshold (60 seconds) - helps identify connection leaks
+      leak-detection-threshold: 60000
+      
+      # Register JMX MBeans for monitoring
+      register-mbeans: true
+  
+  # ==============================================================================
+  # JPA/Hibernate Configuration
+  # ==============================================================================
+  # Replaces: COBOL COPY statements and VSAM record layouts
+  # Entity classes derived from COBOL copybooks (CVACT*.cpy, CVTRA*.cpy, etc.)
+  # ==============================================================================
+  jpa:
+    # Hibernate DDL mode - VALIDATE ONLY (no auto-generation in production)
+    # Schema managed exclusively by Flyway migrations
+    hibernate:
+      ddl-auto: validate
+      
+      # Naming strategy - snake_case for database columns
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+        implicit-strategy: org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy
+    
+    # Show SQL in logs (disabled for production performance)
+    show-sql: false
+    
+    # Hibernate properties
+    properties:
+      hibernate:
+        # PostgreSQL dialect
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        
+        # Format SQL (disabled for production)
+        format_sql: false
+        
+        # Use SQL comments (disabled for production)
+        use_sql_comments: false
+        
+        # JDBC batch size for bulk operations
+        jdbc:
+          batch_size: 25
+          fetch_size: 100
+        
+        # Second-level cache disabled (use application-level caching)
+        cache:
+          use_second_level_cache: false
+          use_query_cache: false
+        
+        # Statistics for monitoring (enabled)
+        generate_statistics: true
+        
+        # Order inserts/updates for better performance
+        order_inserts: true
+        order_updates: true
+        
+        # Connection handling
+        connection:
+          provider_disables_autocommit: true
+  
+  # ==============================================================================
+  # Flyway Database Migration Configuration
+  # ==============================================================================
+  # Manages schema versioning and evolution
+  # Migrations located in: src/main/resources/db/migration/
+  # ==============================================================================
+  flyway:
+    # Enable Flyway for production
+    enabled: true
+    
+    # Migration scripts location
+    locations: classpath:db/migration
+    
+    # Baseline on migrate (for existing databases)
+    baseline-on-migrate: true
+    
+    # Baseline version
+    baseline-version: 0
+    
+    # Validate migrations on startup
+    validate-on-migrate: true
+    
+    # Out-of-order migrations disabled for production safety
+    out-of-order: false
+    
+    # Placeholder replacement enabled
+    placeholder-replacement: true
+    
+    # Placeholder prefix/suffix
+    placeholder-prefix: "${"
+    placeholder-suffix: "}"
+    
+    # Table name for schema history
+    table: flyway_schema_history
+  
+  # ==============================================================================
+  # Spring Batch Configuration
+  # ==============================================================================
+  # Replaces: JCL batch jobs (CBTRN01C, CBACT04C, CBSTM03A, etc.)
+  # Batch processing for transaction posting, interest calculation, statements
+  # ==============================================================================
+  batch:
+    # JDBC initialization - schema managed by Flyway
+    jdbc:
+      initialize-schema: never
+    
+    # Job execution settings
+    job:
+      # Disable auto-run on startup (jobs triggered via REST API or CronJob)
+      enabled: false
+  
+  # ==============================================================================
+  # Cache Configuration
+  # ==============================================================================
+  # Caching for reference data (transaction types, categories, disclosure groups)
+  # ==============================================================================
+  cache:
+    type: caffeine
+    cache-names:
+      - transactionTypes
+      - transactionCategories
+      - disclosureGroups
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=3600s
+  
+  # ==============================================================================
+  # Jackson JSON Configuration
+  # ==============================================================================
+  jackson:
+    # Serialize dates as ISO-8601 strings
+    serialization:
+      write-dates-as-timestamps: false
+      indent-output: false
+    
+    # Deserialization settings
+    deserialization:
+      fail-on-unknown-properties: false
+    
+    # Default property inclusion
+    default-property-inclusion: non_null
+    
+    # Time zone
+    time-zone: UTC
+  
+  # ==============================================================================
+  # Security Configuration
+  # ==============================================================================
+  security:
+    # JWT secret injected from Kubernetes Secret
+    jwt:
+      secret: ${JWT_SECRET}
+      expiration: 3600000  # 1 hour (in milliseconds)
+      refresh-expiration: 86400000  # 24 hours
+
+# ==============================================================================
+# Server Configuration
+# ==============================================================================
+server:
+  # Application port
+  port: 8080
+  
+  # Servlet context path
+  servlet:
+    context-path: /
+  
+  # Compression settings
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain
+    min-response-size: 1024
+  
+  # Connection timeout
+  connection-timeout: 30s
+  
+  # Tomcat configuration
+  tomcat:
+    # Maximum threads
+    threads:
+      max: 200
+      min-spare: 10
+    
+    # Maximum connections
+    max-connections: 8192
+    
+    # Accept count (queue size)
+    accept-count: 100
+    
+    # Access logs disabled (use structured logging)
+    accesslog:
+      enabled: false
+
+# ==============================================================================
+# Spring Boot Actuator Configuration
+# ==============================================================================
+# Exposes health, metrics, and monitoring endpoints for Kubernetes and Prometheus
+# Replaces: Mainframe monitoring tools and CICS statistics
+# ==============================================================================
+management:
+  # Actuator endpoint configuration
+  endpoints:
+    web:
+      # Base path for actuator endpoints
+      base-path: /actuator
+      
+      # Expose specific endpoints (health, info, metrics, prometheus)
+      exposure:
+        include: health,info,metrics,prometheus
+  
+  # Health endpoint configuration
+  endpoint:
+    health:
+      # Show detailed health information (secured by Spring Security)
+      show-details: when-authorized
+      
+      # Probes for Kubernetes liveness and readiness
+      probes:
+        enabled: true
+  
+  # Health indicators
+  health:
+    # Liveness probe (basic application health)
+    livenessState:
+      enabled: true
+    
+    # Readiness probe (can accept traffic)
+    readinessState:
+      enabled: true
+    
+    # Database health check
+    db:
+      enabled: true
+    
+    # Disk space health check
+    diskspace:
+      enabled: true
+      threshold: 10MB
+  
+  # Metrics configuration
+  metrics:
+    # Enable JVM metrics
+    enable:
+      jvm: true
+      process: true
+      system: true
+      logback: true
+      hikaricp: true
+    
+    # Metric tags (for grouping in Prometheus)
+    tags:
+      application: ${spring.application.name}
+      environment: production
+      region: ${AWS_REGION:us-east-1}
+    
+    # Prometheus export configuration
+    export:
+      prometheus:
+        enabled: true
+        step: 1m
+        descriptions: true
+    
+    # Distribution percentiles for latency metrics
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5,0.95,0.99
+      slo:
+        http.server.requests: 200ms,300ms,500ms
+  
+  # Info endpoint configuration
+  info:
+    env:
+      enabled: true
+    java:
+      enabled: true
+    os:
+      enabled: true
+
+# ==============================================================================
+# Logging Configuration
+# ==============================================================================
+# Production-grade logging with CloudWatch integration
+# Structured JSON logging configured in logback-spring.xml
+# PCI-DSS compliance: Sensitive data (card numbers, SSN, passwords) masked
+# ==============================================================================
+logging:
+  # Logging levels
+  level:
+    # Application logging
+    com.aws.carddemo: INFO
+    
+    # Spring Framework logging
+    org.springframework: WARN
+    org.springframework.web: WARN
+    org.springframework.security: WARN
+    org.springframework.boot: WARN
+    
+    # Hibernate logging
+    org.hibernate: WARN
+    org.hibernate.SQL: WARN
+    org.hibernate.type.descriptor.sql.BasicBinder: WARN
+    
+    # HikariCP logging
+    com.zaxxer.hikari: INFO
+    
+    # Flyway logging
+    org.flywaydb: INFO
+    
+    # Spring Batch logging
+    org.springframework.batch: INFO
+  
+  # Log pattern (overridden by logback-spring.xml for JSON format)
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+  
+  # Logback configuration file
+  config: classpath:logback-spring.xml
+
+# ==============================================================================
+# Application-Specific Configuration
+# ==============================================================================
+# Custom configuration properties for CardDemo business logic
+# Replaces: COBOL program parameters and JCL PARM values
+# ==============================================================================
+carddemo:
+  # Security settings
+  security:
+    # JWT configuration
+    jwt:
+      token-validity: 3600  # 1 hour in seconds
+      refresh-token-validity: 86400  # 24 hours in seconds
+    
+    # Password policy
+    password:
+      min-length: 8
+      require-uppercase: true
+      require-lowercase: true
+      require-digit: true
+      require-special-char: true
+      bcrypt-rounds: 10
+  
+  # Transaction processing settings
+  transaction:
+    # Maximum transaction amount (in cents)
+    max-amount: 1000000  # $10,000.00
+    
+    # Batch processing chunk size
+    batch-chunk-size: 100
+    
+    # Transaction validation timeout (milliseconds)
+    validation-timeout: 5000
+  
+  # Interest calculation settings (from CBACT04C.cbl)
+  interest:
+    # Annual percentage rates by disclosure group
+    # Values loaded from DISCLOSURE_GROUP table
+    calculation-enabled: true
+    
+    # Compound frequency (daily)
+    compound-frequency: DAILY
+  
+  # Pagination defaults
+  pagination:
+    default-page-size: 20
+    max-page-size: 100
+  
+  # API rate limiting (requests per minute per user)
+  rate-limit:
+    enabled: true
+    requests-per-minute: 60
+  
+  # Monitoring and alerting
+  monitoring:
+    # Performance thresholds (milliseconds)
+    slow-query-threshold: 1000
+    slow-request-threshold: 2000
+    
+    # Alert on metrics
+    alert-on-error-rate: true
+    error-rate-threshold: 0.05  # 5%
+
+# ==============================================================================
+# AWS Integration Configuration
+# ==============================================================================
+# AWS-specific settings for CloudWatch, Secrets Manager, etc.
+# ==============================================================================
+cloud:
+  aws:
+    # AWS Region
+    region:
+      static: ${AWS_REGION:us-east-1}
+    
+    # Credentials (use IAM role in EKS)
+    credentials:
+      instance-profile: true
+    
+    # CloudWatch Logs
+    cloudwatch:
+      enabled: true
+      log-group: /aws/eks/carddemo-prod
+      log-stream: application
+    
+    # Secrets Manager (for sensitive configuration)
+    secretsmanager:
+      enabled: true
+
+# ==============================================================================
+# End of Production Configuration
+# ==============================================================================
