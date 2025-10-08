@@ -110,6 +110,15 @@ public class DataSourceConfig {
     private String password;
     
     /**
+     * JDBC driver class name.
+     * Default: org.postgresql.Driver (for PostgreSQL production database).
+     * Test profile uses: org.h2.Driver (for H2 in-memory database).
+     * Injected from application.yml or application-test.yml.
+     */
+    @Value("${spring.datasource.driver-class-name:org.postgresql.Driver}")
+    private String driverClassName;
+    
+    /**
      * HikariCP maximum pool size.
      * Default: 20 connections (sufficient for high concurrency).
      */
@@ -175,8 +184,8 @@ public class DataSourceConfig {
      * - Monitoring (built-in metrics and health checks)
      * 
      * Configuration details:
-     * - Driver: org.postgresql.Driver (PostgreSQL 15+ JDBC driver)
-     * - Pool size: 10-20 connections (optimized for Kubernetes pod deployment)
+     * - Driver: org.postgresql.Driver (production) or org.h2.Driver (test profile)
+     * - Pool size: 10-20 connections (production), 2-5 connections (test profile)
      * - Timeouts: 30s connection, 10m idle, 30m max lifetime
      * - Validation: SELECT 1 query before connection use
      * - Prepared statement cache: 256 queries, 5MB size
@@ -201,7 +210,8 @@ public class DataSourceConfig {
     @Bean
     @Primary
     public DataSource dataSource() {
-        logger.info("Initializing HikariCP DataSource for PostgreSQL connectivity");
+        logger.info("Initializing HikariCP DataSource");
+        logger.info("Driver class: {}", driverClassName);
         logger.info("JDBC URL: {}", maskPassword(jdbcUrl));
         logger.info("Maximum pool size: {}", maximumPoolSize);
         logger.info("Minimum idle connections: {}", minimumIdle);
@@ -214,7 +224,7 @@ public class DataSourceConfig {
             hikariConfig.setJdbcUrl(jdbcUrl);
             hikariConfig.setUsername(username);
             hikariConfig.setPassword(password);
-            hikariConfig.setDriverClassName("org.postgresql.Driver");
+            hikariConfig.setDriverClassName(driverClassName);
             
             // Connection pool sizing
             hikariConfig.setMaximumPoolSize(maximumPoolSize);

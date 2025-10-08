@@ -112,7 +112,7 @@ public class DailyTransactionReader {
      *   </tr>
      *   <tr>
      *     <td>name</td>
-     *     <td>dailyTransactionReader</td>
+     *     <td>dailyTransactionItemReader</td>
      *     <td>Unique bean identifier for Spring context</td>
      *   </tr>
      *   <tr>
@@ -183,14 +183,14 @@ public class DailyTransactionReader {
      * @see com.aws.carddemo.config.DataSourceConfig
      * @see com.aws.carddemo.batch.config.TransactionPostingJobConfig
      */
-    @Bean
-    public JpaPagingItemReader<DailyTransaction> dailyTransactionReader(
+    @Bean(name = "dailyTransactionItemReader")
+    public JpaPagingItemReader<DailyTransaction> dailyTransactionItemReader(
             EntityManagerFactory entityManagerFactory) throws Exception {
         
         JpaPagingItemReader<DailyTransaction> reader = new JpaPagingItemReader<>();
         
         // Set unique bean name for Spring context and ExecutionContext state storage
-        reader.setName("dailyTransactionReader");
+        reader.setName("dailyTransactionItemReader");
         
         // Configure JPQL query to filter PENDING transactions in chronological order
         // This replaces COBOL sequential file read pattern from CBTRN01C.cbl
