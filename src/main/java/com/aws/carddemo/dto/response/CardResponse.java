@@ -22,6 +22,7 @@
 package com.aws.carddemo.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
@@ -105,13 +106,17 @@ public class CardResponse implements Serializable {
      * Maps from CARD-EXPIRAION-DATE (PIC X(10), YYYY-MM-DD) in CVACT02Y.cpy copybook.
      * Displayed as MM/YY format in EXPMON/EXPYEAR fields on COCRDSL.bms screen.
      * 
-     * JSON format: "MM/yy" (e.g., "12/25" for December 2025)
+     * JSON format: ISO date format "yyyy-MM-dd" (e.g., "2025-12-31")
+     * Display format: Use formatExpirationDate() method to get "MM/yy" format (e.g., "12/25")
      * Internal storage: Full LocalDate for precise expiration tracking
      * 
-     * Example: 2025-12-31 displayed as "12/25"
+     * Note: @JsonFormat with "MM/yy" pattern removed because it caused deserialization failures.
+     * The "MM/yy" format doesn't include day information required for LocalDate.
+     * Use the static formatExpirationDate() method for "MM/yy" display formatting.
+     * 
+     * Example: 2025-12-31 serializes as "2025-12-31", formats as "12/25" for display
      */
     @JsonProperty("expiration_date")
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "MM/yy")
     private LocalDate expirationDate;
 
     /**
@@ -185,8 +190,11 @@ public class CardResponse implements Serializable {
      * Validates if card is expired based on expiration date.
      * Helper method for business logic validation in CardService.
      * 
+     * Excluded from JSON serialization (computed field, no setter).
+     * 
      * @return true if card is expired, false otherwise
      */
+    @JsonIgnore
     public boolean isExpired() {
         if (expirationDate == null) {
             return false; // Cannot determine expiration
@@ -205,9 +213,11 @@ public class CardResponse implements Serializable {
      * Combines activeStatus and expirationDate checks.
      * 
      * Used for transaction authorization decisions.
+     * Excluded from JSON serialization (computed field, no setter).
      * 
      * @return true if card is active and not expired, false otherwise
      */
+    @JsonIgnore
     public boolean isUsable() {
         return "Y".equals(activeStatus) && !isExpired();
     }
