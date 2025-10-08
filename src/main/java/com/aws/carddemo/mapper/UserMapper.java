@@ -118,8 +118,8 @@ public interface UserMapper {
     /**
      * Converts User entity to UserResponse DTO for API responses.
      * 
-     * <p><strong>CRITICAL SECURITY REQUIREMENT:</strong> This method explicitly excludes
-     * the passwordHash field from the response DTO per PCI-DSS compliance and security
+     * <p><strong>CRITICAL SECURITY REQUIREMENT:</strong> The passwordHash field from User entity
+     * is automatically excluded from UserResponse DTO per PCI-DSS compliance and security
      * best practices. Passwords must NEVER be exposed in API responses under any circumstances.</p>
      * 
      * <p><strong>Field Mappings:</strong></p>
@@ -134,7 +134,8 @@ public interface UserMapper {
      *   <li>lastLogin → lastLogin (LocalDateTime, nullable)</li>
      *   <li>accountLocked → accountLocked (Boolean)</li>
      *   <li>failedLoginAttempts → failedLoginAttempts (Integer)</li>
-     *   <li>passwordHash → [EXCLUDED - NEVER MAPPED]</li>
+     *   <li>passwordHash → [AUTOMATICALLY EXCLUDED - not present in UserResponse]</li>
+     *   <li>authorities (computed property) → [AUTOMATICALLY EXCLUDED - not present in UserResponse]</li>
      * </ul>
      * 
      * <p><strong>Derived Fields:</strong></p>
@@ -144,17 +145,19 @@ public interface UserMapper {
      *   <li><strong>createdAt/updatedAt</strong>: Mapped from BaseEntity audit fields (if User extends BaseEntity)</li>
      * </ul>
      * 
-     * <p><strong>Security Note:</strong> The @Mapping annotation with target="passwordHash", ignore=true
-     * ensures that even if the User entity has a passwordHash field populated, it will NEVER be
-     * copied to the UserResponse DTO, preventing accidental exposure in JSON responses.</p>
+     * <p><strong>Security Note:</strong> Since UserResponse DTO does not contain a passwordHash field,
+     * MapStruct automatically excludes it from the mapping. The User entity's passwordHash field
+     * will never be copied to the response DTO, preventing accidental exposure in JSON responses.
+     * The getAuthorities() computed property is also automatically excluded.</p>
      * 
      * @param user User entity from database (must not be null)
-     * @return UserResponse DTO for JSON serialization (with passwordHash excluded)
+     * @return UserResponse DTO for JSON serialization (with passwordHash and authorities automatically excluded)
      * @throws NullPointerException if user parameter is null
      */
-    @Mapping(target = "passwordHash", ignore = true)
     @Mapping(target = "userTypeDescription", source = "userType", qualifiedByName = "getUserTypeDescription")
     @Mapping(target = "roles", source = "userType", qualifiedByName = "getRolesFromUserType")
+    @Mapping(target = "createdAt", ignore = true)  // Not present in User entity (could be added via BaseEntity in future)
+    @Mapping(target = "updatedAt", ignore = true)  // Not present in User entity (could be added via BaseEntity in future)
     UserResponse toResponse(User user);
 
     /**
@@ -239,6 +242,7 @@ public interface UserMapper {
      *   <li>lastLogin: Updated only by authentication service</li>
      *   <li>accountLocked: Updated only by security service or admin action</li>
      *   <li>failedLoginAttempts: Updated only by authentication service</li>
+     *   <li>authorities: Computed property derived from userType (not a persisted field)</li>
      *   <li>version: Managed by JPA @Version for optimistic locking</li>
      * </ul>
      * 
@@ -274,6 +278,7 @@ public interface UserMapper {
     @Mapping(target = "lastLogin", ignore = true)  // Updated by authentication service only
     @Mapping(target = "accountLocked", ignore = true)  // Updated by security service only
     @Mapping(target = "failedLoginAttempts", ignore = true)  // Updated by authentication service only
+    @Mapping(target = "authorities", ignore = true)  // Computed property derived from userType
     @Mapping(target = "version", ignore = true)  // Managed by JPA @Version
     void updateEntityFromRequest(UserUpdateRequest request, @MappingTarget User user);
 
