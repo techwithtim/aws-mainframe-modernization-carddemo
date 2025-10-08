@@ -60,6 +60,7 @@
         <logstash-logback.version>7.4</logstash-logback.version>
         <h2.version>2.2.224</h2.version>
         <awaitility.version>4.2.1</awaitility.version>
+        <caffeine.version>3.1.8</caffeine.version>
         <micrometer.version>1.13.0</micrometer.version>
         <aws-sdk.version>2.25.62</aws-sdk.version>
         
@@ -116,6 +117,13 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-cache</artifactId>
+        </dependency>
+        
+        <!-- Caffeine Cache - High-performance caching library for Spring Cache -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+            <version>${caffeine.version}</version>
         </dependency>
         
         <!-- ===================================================================
