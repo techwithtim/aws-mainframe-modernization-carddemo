@@ -7,6 +7,37 @@ batch-app/markers/*
 .DS_Store
 **/.DS_Store
 
+# Java/Maven/IDE patterns for modernized application
+
+# Maven build output
+target/
+
+# IDE-specific files
+*.iml
+*.iws
+*.ipr
+.classpath
+.project
+.settings/
+
+# Java compiled files
+*.class
+*.jar
+*.war
+*.ear
+
+# Log files
+*.log
+
+# OS-specific files
+Thumbs.db
+
+# Test output
+test-output/
+
+# Spring Boot DevTools
+.springBeans
+
 # Java/Maven specific
 target/
 *.class
