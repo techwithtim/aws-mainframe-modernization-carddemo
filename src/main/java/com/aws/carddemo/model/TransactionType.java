@@ -11,10 +11,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.Cache;
-import org.hibernate.annotations.CacheConcurrencyStrategy;
 import org.hibernate.annotations.CreationTimestamp;
-import org.springframework.cache.annotation.Cacheable;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
@@ -46,9 +43,9 @@ import java.time.LocalDateTime;
  * 
  * <p><b>Caching Strategy:</b></p>
  * <ul>
- *   <li>Application-level cache: @Cacheable annotation for Spring Cache integration</li>
- *   <li>Hibernate second-level cache: READ_ONLY strategy (reference data never changes)</li>
+ *   <li>Application-level cache: Spring Cache on repository method (findAll() with @Cacheable)</li>
  *   <li>Performance optimization: Reduces database queries for frequently accessed lookups</li>
+ *   <li>Cache managed at repository layer, not entity layer, for better test compatibility</li>
  * </ul>
  * 
  * <p><b>Data Validation:</b></p>
@@ -68,8 +65,6 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Cacheable("transactionTypes")
-@Cache(usage = CacheConcurrencyStrategy.READ_ONLY, region = "transactionTypeCache")
 public class TransactionType implements Serializable {
 
     /**
