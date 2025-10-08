@@ -1,31 +1,8 @@
 package com.aws.carddemo.model;
 
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Index;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.Table;
-import jakarta.validation.constraints.Digits;
-import jakarta.validation.constraints.Future;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.PastOrPresent;
-import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Size;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
+import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
+import lombok.*;
 import lombok.experimental.SuperBuilder;
 
 import java.io.Serializable;
@@ -36,294 +13,335 @@ import java.util.List;
 
 /**
  * JPA entity representing credit card account master data.
+ * Migrated from: app/cpy/CVACT01Y.cpy (ACCOUNT-RECORD, 300-byte COBOL structure)
  * 
- * <p><b>Legacy Mapping:</b> Migrated from COBOL copybook {@code app/cpy/CVACT01Y.cpy}
- * (ACCOUNT-RECORD structure, 300-byte fixed-length record with 17 fields).
+ * This entity maintains financial account information including balances, credit limits,
+ * and account lifecycle dates. It serves as the central entity linking customers to their
+ * cards and transaction history.
  * 
- * <p><b>Business Purpose:</b> The Account entity represents a credit card account
- * with complete financial information including current balance, credit limits,
- * transaction history, and associated cards. Each account belongs to one customer
- * and can have multiple physical cards and transactions.
+ * Key Design Decisions:
+ * - accountId: Synthetic surrogate primary key (Long) for JPA performance
+ * - accountNumber: Business natural key (String) preserving COBOL ACCT-ID with leading zeros
+ * - BigDecimal: All monetary fields use NUMERIC(12,2) precision per COBOL PIC S9(10)V99 COMP-3
+ * - LocalDate: Timezone-agnostic date representation for account lifecycle management
+ * - Bidirectional relationships: @ManyToOne to Customer, @OneToMany to Card/Transaction
  * 
- * <p><b>Financial Data Precision:</b> All monetary fields use {@code BigDecimal}
- * with precision=12 and scale=2 to maintain exact decimal precision required for
- * financial calculations per COBOL PIC S9(10)V99 COMP-3 packed decimal mapping.
- * This prevents floating-point rounding errors critical for banking applications.
+ * PCI-DSS Compliance:
+ * - Financial data stored with exact decimal precision
+ * - Audit trail via BaseEntity (createdAt, updatedAt)
+ * - Optimistic locking via @Version preventing concurrent modification conflicts
  * 
- * <p><b>Database Schema:</b> Maps to {@code ACCOUNT} table with indexes and constraints.
- * 
- * @see BaseEntity
- * @see Customer
- * @author CardDemo Modernization Team
- * @since 1.0.0
+ * @see BaseEntity for audit fields and version control
+ * @see Customer for parent demographic entity
+ * @see Card for associated payment cards
+ * @see Transaction for transaction history
  */
 @Entity
 @Table(
-    name = "account",
+    name = "ACCOUNT",
     indexes = {
         @Index(name = "idx_account_number", columnList = "account_number", unique = true),
         @Index(name = "idx_account_customer", columnList = "customer_id"),
         @Index(name = "idx_account_group", columnList = "group_id"),
         @Index(name = "idx_account_status", columnList = "active_status")
+    },
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_account_number", columnNames = {"account_number"})
     }
 )
-@Data
-@EqualsAndHashCode(callSuper = true)
-@ToString(callSuper = true)
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @SuperBuilder
+@ToString(exclude = {"customer", "cards", "transactions"})
+@EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = false)
 public class Account extends BaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     /**
-     * Unique account identifier, auto-generated primary key.
+     * Synthetic surrogate primary key.
+     * Generated automatically by database IDENTITY strategy.
      * 
-     * <p><b>Note:</b> This is the synthetic surrogate primary key used for database 
-     * relationships. The business/natural key from COBOL is stored in {@code acctId}.
+     * COBOL Mapping: N/A (new field for JPA requirements)
      */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "account_id", nullable = false)
+    @EqualsAndHashCode.Include
     private Long accountId;
 
     /**
-     * Account business key (11-digit numeric ID from COBOL system).
+     * Business account number - the original COBOL ACCT-ID.
+     * Stored as VARCHAR to preserve leading zeros (e.g., "00012345678").
      * 
-     * <p><b>Legacy Mapping:</b> ACCT-ID PIC 9(11) from CVACT01Y.cpy.
-     * 
-     * <p>This is the business identifier from the legacy COBOL/VSAM system,
-     * stored as a zero-padded 11-character string to preserve leading zeros.
-     * 
-     * <p><b>Example:</b> "00000000001" for account 1, "00012345678" for account 12345678
-     * 
-     * <p><b>Validation:</b>
-     * <ul>
-     *   <li>{@code @NotBlank}: Required field, cannot be null or empty</li>
-     *   <li>{@code @Pattern}: Must be exactly 11 numeric digits (0-9)</li>
-     *   <li>{@code @Column(unique=true)}: Unique constraint across all accounts</li>
-     * </ul>
-     * 
-     * <p><b>Database Schema:</b> acct_id VARCHAR(11) UNIQUE NOT NULL
-     * 
-     * <p><b>Note:</b> This is the business/natural key that uniquely identifies
-     * the account in business operations and corresponds to COBOL ACCT-ID field.
+     * COBOL Mapping: ACCT-ID PIC 9(11)
+     * Validation: Exactly 11 digits, unique across all accounts
      */
-    @NotBlank(message = "Account business ID is required")
-    @Pattern(regexp = "\\d{11}", message = "Account ID must be exactly 11 numeric digits")
-    @Column(name = "acct_id", length = 11, unique = true, nullable = false)
-    private String acctId;
-
-    /**
-     * Account number (11 digits, unique identifier for customer-facing operations).
-     * 
-     * <p><b>Data Type:</b> Stored as VARCHAR to preserve leading zeros.
-     * <p><b>Business Rule:</b> Must be exactly 11 digits for validation.
-     * 
-     * <p><b>Note:</b> This may be the same as {@code acctId} or a formatted version
-     * for display purposes. Keeping for backward compatibility with existing code.
-     */
-    @NotBlank(message = "Account number is required")
+    @Column(name = "account_number", nullable = false, length = 11, unique = true)
+    @NotNull(message = "Account number is required")
     @Size(min = 11, max = 11, message = "Account number must be exactly 11 digits")
     @Pattern(regexp = "\\d{11}", message = "Account number must contain only digits")
-    @Column(name = "account_number", length = 11, unique = true, nullable = false)
+    @EqualsAndHashCode.Include
     private String accountNumber;
 
     /**
-     * Reference to the customer who owns this account.
+     * Parent customer owning this account.
+     * LAZY fetch to avoid N+1 query problems.
+     * Foreign key constraint with RESTRICT prevents orphaned accounts.
      * 
-     * <p><b>Relationship:</b> Many-to-One with Customer (lazy fetch).
-     * <p><b>Foreign Key:</b> customer_id with RESTRICT constraint.
+     * COBOL Mapping: Implicit relationship through customer file lookups
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "customer_id", nullable = false)
+    @JoinColumn(
+        name = "customer_id",
+        nullable = false,
+        foreignKey = @ForeignKey(name = "fk_account_customer")
+    )
     @NotNull(message = "Customer is required")
-    @ToString.Exclude
-    @EqualsAndHashCode.Exclude
     private Customer customer;
 
     /**
-     * Account active status ("Y" = active, "N" = inactive).
+     * Account active status indicator.
+     * 'Y' = Active, 'N' = Inactive/Closed
      * 
-     * <p><b>Legacy Mapping:</b> ACCT-ACTIVE-STATUS PIC X(01) from CVACT01Y.cpy.
+     * COBOL Mapping: ACCT-ACTIVE-STATUS PIC X(01)
+     * Database: CHECK constraint enforces valid values
      */
+    @Column(name = "active_status", nullable = false, length = 1)
+    @NotNull(message = "Active status is required")
     @Pattern(regexp = "[YN]", message = "Active status must be 'Y' or 'N'")
-    @Size(min = 1, max = 1, message = "Active status must be exactly 1 character")
-    @Column(name = "active_status", length = 1)
     private String activeStatus;
 
     /**
-     * Current account balance (precision: 12 digits, scale: 2 decimal places).
+     * Current account balance.
+     * Precision: 12 digits total, 2 decimal places (handles up to 9,999,999,999.99)
      * 
-     * <p><b>Legacy Mapping:</b> ACCT-CURR-BAL PIC S9(10)V99 from CVACT01Y.cpy.
-     * <p><b>Business Rule:</b> Must be >= 0 (non-negative balance).
+     * COBOL Mapping: ACCT-CURR-BAL PIC S9(10)V99
+     * Database: CHECK constraint ensures non-negative balance
      */
+    @Column(name = "current_balance", nullable = false, precision = 12, scale = 2)
     @NotNull(message = "Current balance is required")
-    @Digits(integer = 10, fraction = 2, message = "Current balance must have at most 10 integer digits and 2 fraction digits")
-    @Min(value = 0, message = "Current balance cannot be negative")
-    @Column(name = "current_balance", precision = 12, scale = 2, nullable = false)
+    @Digits(integer = 10, fraction = 2, message = "Current balance must have at most 10 integer digits and 2 decimal places")
+    @DecimalMin(value = "0.00", inclusive = true, message = "Current balance cannot be negative")
     private BigDecimal currentBalance;
 
     /**
      * Maximum credit limit for purchases.
      * 
-     * <p><b>Legacy Mapping:</b> ACCT-CREDIT-LIMIT PIC S9(10)V99 from CVACT01Y.cpy.
+     * COBOL Mapping: ACCT-CREDIT-LIMIT PIC S9(10)V99
      */
+    @Column(name = "credit_limit", nullable = false, precision = 12, scale = 2)
     @NotNull(message = "Credit limit is required")
-    @Digits(integer = 10, fraction = 2, message = "Credit limit must have at most 10 integer digits and 2 fraction digits")
-    @Min(value = 0, message = "Credit limit cannot be negative")
-    @Column(name = "credit_limit", precision = 12, scale = 2, nullable = false)
+    @Digits(integer = 10, fraction = 2, message = "Credit limit must have at most 10 integer digits and 2 decimal places")
+    @DecimalMin(value = "0.00", inclusive = true, message = "Credit limit cannot be negative")
     private BigDecimal creditLimit;
 
     /**
-     * Maximum cash advance credit limit.
+     * Maximum cash advance limit.
+     * Typically lower than regular credit limit.
      * 
-     * <p><b>Legacy Mapping:</b> ACCT-CASH-CREDIT-LIMIT PIC S9(10)V99 from CVACT01Y.cpy.
+     * COBOL Mapping: ACCT-CASH-CREDIT-LIMIT PIC S9(10)V99
      */
-    @Digits(integer = 10, fraction = 2, message = "Cash credit limit must have at most 10 integer digits and 2 fraction digits")
-    @Min(value = 0, message = "Cash credit limit cannot be negative")
-    @Column(name = "cash_credit_limit", precision = 12, scale = 2)
+    @Column(name = "cash_credit_limit", nullable = false, precision = 12, scale = 2)
+    @NotNull(message = "Cash credit limit is required")
+    @Digits(integer = 10, fraction = 2, message = "Cash credit limit must have at most 10 integer digits and 2 decimal places")
+    @DecimalMin(value = "0.00", inclusive = true, message = "Cash credit limit cannot be negative")
     private BigDecimal cashCreditLimit;
 
     /**
-     * Total credits in current billing cycle.
+     * Total credits posted in current billing cycle.
      * 
-     * <p><b>Legacy Mapping:</b> ACCT-CURR-CYC-CREDIT PIC S9(10)V99 from CVACT01Y.cpy.
+     * COBOL Mapping: ACCT-CURR-CYC-CREDIT PIC S9(10)V99
      */
-    @Digits(integer = 10, fraction = 2, message = "Current cycle credit must have at most 10 integer digits and 2 fraction digits")
-    @Column(name = "current_cycle_credit", precision = 12, scale = 2)
+    @Column(name = "current_cycle_credit", nullable = false, precision = 12, scale = 2)
+    @NotNull(message = "Current cycle credit is required")
+    @Digits(integer = 10, fraction = 2, message = "Current cycle credit must have at most 10 integer digits and 2 decimal places")
+    @DecimalMin(value = "0.00", inclusive = true, message = "Current cycle credit cannot be negative")
     private BigDecimal currentCycleCredit;
 
     /**
-     * Total debits in current billing cycle.
+     * Total debits posted in current billing cycle.
      * 
-     * <p><b>Legacy Mapping:</b> ACCT-CURR-CYC-DEBIT PIC S9(10)V99 from CVACT01Y.cpy.
+     * COBOL Mapping: ACCT-CURR-CYC-DEBIT PIC S9(10)V99
      */
-    @Digits(integer = 10, fraction = 2, message = "Current cycle debit must have at most 10 integer digits and 2 fraction digits")
-    @Column(name = "current_cycle_debit", precision = 12, scale = 2)
+    @Column(name = "current_cycle_debit", nullable = false, precision = 12, scale = 2)
+    @NotNull(message = "Current cycle debit is required")
+    @Digits(integer = 10, fraction = 2, message = "Current cycle debit must have at most 10 integer digits and 2 decimal places")
+    @DecimalMin(value = "0.00", inclusive = true, message = "Current cycle debit cannot be negative")
     private BigDecimal currentCycleDebit;
 
     /**
-     * Account opening date.
+     * Date account was opened.
+     * Must be in the past or today.
      * 
-     * <p><b>Legacy Mapping:</b> ACCT-OPEN-DATE PIC X(10) from CVACT01Y.cpy.
-     * <p><b>Business Rule:</b> Must be in the past or present.
+     * COBOL Mapping: ACCT-OPEN-DATE PIC X(10) format YYYY-MM-DD
      */
-    @NotNull(message = "Open date is required")
-    @PastOrPresent(message = "Open date must be in the past or present")
     @Column(name = "open_date", nullable = false)
+    @NotNull(message = "Open date is required")
+    @PastOrPresent(message = "Open date must be in the past or today")
     private LocalDate openDate;
 
     /**
-     * Account expiration date.
+     * Date account expires.
+     * Must be in the future relative to open date.
      * 
-     * <p><b>Legacy Mapping:</b> ACCT-EXPIRAION-DATE PIC X(10) from CVACT01Y.cpy.
-     * <p><b>Business Rule:</b> Must be in the future and after open date.
+     * COBOL Mapping: ACCT-EXPIRAION-DATE PIC X(10) format YYYY-MM-DD
+     * Note: Preserving COBOL typo "EXPIRAION" in documentation
+     * Database: CHECK constraint enforces expiration_date > open_date
      */
+    @Column(name = "expiration_date", nullable = false)
     @NotNull(message = "Expiration date is required")
     @Future(message = "Expiration date must be in the future")
-    @Column(name = "expiration_date", nullable = false)
     private LocalDate expirationDate;
 
     /**
-     * Account reissue date (optional).
+     * Date card was reissued (e.g., after lost/stolen report).
+     * Optional field - null if card never reissued.
      * 
-     * <p><b>Legacy Mapping:</b> ACCT-REISSUE-DATE PIC X(10) from CVACT01Y.cpy.
+     * COBOL Mapping: ACCT-REISSUE-DATE PIC X(10) format YYYY-MM-DD
      */
     @Column(name = "reissue_date")
     private LocalDate reissueDate;
 
     /**
-     * Account billing address ZIP code.
+     * ZIP code associated with account billing address.
+     * Format: 5 digits or 5+4 (e.g., "12345" or "12345-6789")
      * 
-     * <p><b>Legacy Mapping:</b> ACCT-ADDR-ZIP PIC X(10) from CVACT01Y.cpy.
+     * COBOL Mapping: ACCT-ADDR-ZIP PIC X(10)
      */
-    @Pattern(regexp = "\\d{5}(-\\d{4})?", message = "ZIP code must be 5 digits or 9 digits with hyphen (12345 or 12345-6789)")
-    @Size(max = 10, message = "ZIP code cannot exceed 10 characters")
     @Column(name = "address_zip", length = 10)
+    @Pattern(
+        regexp = "\\d{5}(-\\d{4})?",
+        message = "ZIP code must be 5 digits or 5+4 format (e.g., 12345 or 12345-6789)"
+    )
     private String addressZip;
 
     /**
-     * Disclosure group ID for interest rate tier.
+     * Disclosure group ID for interest rate assignment.
+     * Links to DISCLOSURE_GROUP table for APR calculations.
      * 
-     * <p><b>Legacy Mapping:</b> ACCT-GROUP-ID PIC X(10) from CVACT01Y.cpy.
+     * COBOL Mapping: ACCT-GROUP-ID PIC X(10)
      */
-    @Size(max = 10, message = "Group ID cannot exceed 10 characters")
     @Column(name = "group_id", length = 10)
+    @Size(max = 10, message = "Group ID cannot exceed 10 characters")
     private String groupId;
 
     /**
-     * Collection of physical cards associated with this account.
+     * Collection of cards associated with this account.
+     * Bidirectional relationship - mapped by "account" in Card entity.
+     * Cascade ALL operations to maintain referential integrity.
+     * OrphanRemoval ensures deleted cards are removed from database.
      * 
-     * <p><b>Relationship:</b> One-to-Many bidirectional with Card.
+     * COBOL Mapping: One-to-many relationship through CARDXREF file
      */
-    @OneToMany(mappedBy = "account", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(
+        mappedBy = "account",
+        cascade = CascadeType.ALL,
+        orphanRemoval = true,
+        fetch = FetchType.LAZY
+    )
     @Builder.Default
-    @ToString.Exclude
-    @EqualsAndHashCode.Exclude
     private List<Card> cards = new ArrayList<>();
 
     /**
      * Collection of transactions posted to this account.
+     * Bidirectional relationship - mapped by "account" in Transaction entity.
+     * Cascade ALL operations for transaction lifecycle management.
      * 
-     * <p><b>Relationship:</b> One-to-Many bidirectional with Transaction.
+     * COBOL Mapping: One-to-many relationship through TRANSACT file
      */
-    @OneToMany(mappedBy = "account", cascade = CascadeType.ALL)
+    @OneToMany(
+        mappedBy = "account",
+        cascade = CascadeType.ALL,
+        fetch = FetchType.LAZY
+    )
     @Builder.Default
-    @ToString.Exclude
-    @EqualsAndHashCode.Exclude
     private List<Transaction> transactions = new ArrayList<>();
 
     /**
-     * Helper method to add a card to the account's card collection.
-     * Maintains bidirectional relationship integrity.
+     * Helper method to add a card to this account.
+     * Maintains bidirectional relationship consistency.
      * 
-     * @param card the card to add
+     * @param card Card to add to this account
      */
     public void addCard(Card card) {
-        if (card != null) {
-            cards.add(card);
-            card.setAccount(this);
-        }
+        cards.add(card);
+        card.setAccount(this);
     }
 
     /**
-     * Helper method to remove a card from the account's card collection.
-     * Maintains bidirectional relationship integrity.
+     * Helper method to remove a card from this account.
+     * Maintains bidirectional relationship consistency.
      * 
-     * @param card the card to remove
+     * @param card Card to remove from this account
      */
     public void removeCard(Card card) {
-        if (card != null) {
-            cards.remove(card);
-            card.setAccount(null);
-        }
+        cards.remove(card);
+        card.setAccount(null);
     }
 
     /**
-     * Helper method to add a transaction to the account's transaction collection.
-     * Maintains bidirectional relationship integrity.
+     * Helper method to add a transaction to this account.
+     * Maintains bidirectional relationship consistency.
      * 
-     * @param transaction the transaction to add
+     * @param transaction Transaction to add to this account
      */
     public void addTransaction(Transaction transaction) {
-        if (transaction != null) {
-            transactions.add(transaction);
-            transaction.setAccount(this);
-        }
+        transactions.add(transaction);
+        transaction.setAccount(this);
     }
 
     /**
-     * Helper method to remove a transaction from the account's transaction collection.
-     * Maintains bidirectional relationship integrity.
+     * Helper method to remove a transaction from this account.
+     * Maintains bidirectional relationship consistency.
      * 
-     * @param transaction the transaction to remove
+     * @param transaction Transaction to remove from this account
      */
     public void removeTransaction(Transaction transaction) {
-        if (transaction != null) {
-            transactions.remove(transaction);
-            transaction.setAccount(null);
+        transactions.remove(transaction);
+        transaction.setAccount(null);
+    }
+
+    /**
+     * Business logic method to check if account has available credit.
+     * 
+     * @param amount Amount to check against available credit
+     * @return true if sufficient credit available, false otherwise
+     */
+    public boolean hasAvailableCredit(BigDecimal amount) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) < 0) {
+            return false;
         }
+        BigDecimal availableCredit = creditLimit.subtract(currentBalance);
+        return availableCredit.compareTo(amount) >= 0;
+    }
+
+    /**
+     * Business logic method to calculate available credit.
+     * 
+     * @return Available credit (credit limit minus current balance)
+     */
+    public BigDecimal getAvailableCredit() {
+        return creditLimit.subtract(currentBalance);
+    }
+
+    /**
+     * Business logic method to check if account is active.
+     * 
+     * @return true if active_status is 'Y', false otherwise
+     */
+    public boolean isActive() {
+        return "Y".equals(activeStatus);
+    }
+
+    /**
+     * Business logic method to check if account is expired.
+     * 
+     * @return true if expiration date has passed, false otherwise
+     */
+    public boolean isExpired() {
+        return expirationDate != null && LocalDate.now().isAfter(expirationDate);
     }
 }
