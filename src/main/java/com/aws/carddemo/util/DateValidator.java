@@ -144,7 +144,8 @@ public class DateValidator {
             // Determine specific error type based on exception message
             String errorMessage = e.getMessage().toLowerCase();
             
-            if (errorMessage.contains("month")) {
+            // Check specifically for MonthOfYear errors (not DayOfMonth)
+            if (errorMessage.contains("monthofyear")) {
                 // FC-INVALID-MONTH
                 return new ValidationResult(
                     false,
@@ -153,7 +154,22 @@ public class DateValidator {
                     dateStr,
                     formatPattern
                 );
-            } else if (errorMessage.contains("numeric") || errorMessage.contains("text")) {
+            } 
+            // Check for date component errors (DayOfMonth, Year, etc.)
+            else if (errorMessage.contains("dayofmonth") || 
+                     errorMessage.contains("invalid value for")) {
+                // FC-BAD-DATE-VALUE (invalid day, year, etc.)
+                return new ValidationResult(
+                    false,
+                    2,
+                    "Date value error",
+                    dateStr,
+                    formatPattern
+                );
+            }
+            // Check for truly non-numeric data (letters where numbers expected)
+            else if (errorMessage.contains("could not be parsed at index") ||
+                     errorMessage.contains("unparseable")) {
                 // FC-NON-NUMERIC-DATA
                 return new ValidationResult(
                     false,
@@ -162,7 +178,8 @@ public class DateValidator {
                     dateStr,
                     formatPattern
                 );
-            } else {
+            } 
+            else {
                 // FC-BAD-DATE-VALUE (general parsing error)
                 return new ValidationResult(
                     false,
