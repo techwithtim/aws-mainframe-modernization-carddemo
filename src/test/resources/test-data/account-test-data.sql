@@ -237,204 +237,204 @@ VALUES (50, '000000050', 'Aniya', 'Alba', 'Von', '1588 Nienow Cape', 'Suite 187'
 -- =============================================================================
 
 -- Account 1: Customer 1 (acctdata.txt line 1)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (1, '00000000001', '00000000001', 'Y', 19.40, 202.00, 102.00, '2014-11-20', '2025-05-20', '2025-05-20', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (1, '00000000001', 'Y', 19.40, 202.00, 102.00, 0.00, 0.00, '2014-11-20', '2025-05-20', '2025-05-20', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 2: Customer 2 (acctdata.txt line 2)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (2, '00000000002', '00000000002', 'Y', 15.80, 613.00, 544.80, '2013-06-19', '2024-08-11', '2024-08-11', 2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (2, '00000000002', 'Y', 15.80, 613.00, 544.80, 0.00, 0.00, '2013-06-19', '2024-08-11', '2024-08-11', 2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 3: Customer 3 (acctdata.txt line 3)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (3, '00000000003', '00000000003', 'Y', 14.70, 490.90, 53.80, '2013-08-23', '2024-01-10', '2024-01-10', 3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (3, '00000000003', 'Y', 14.70, 490.90, 53.80, 0.00, 0.00, '2013-08-23', '2024-01-10', '2024-01-10', 3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 4: Customer 4 (acctdata.txt line 4)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (4, '00000000004', '00000000004', 'Y', 4.00, 350.30, 278.90, '2012-11-17', '2023-12-16', '2023-12-16', 4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (4, '00000000004', 'Y', 4.00, 350.30, 278.90, 0.00, 0.00, '2012-11-17', '2023-12-16', '2023-12-16', 4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 5: Customer 5 (acctdata.txt line 5)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (5, '00000000005', '00000000005', 'Y', 34.50, 381.90, 243.00, '2012-10-03', '2025-03-09', '2025-03-09', 5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (5, '00000000005', 'Y', 34.50, 381.90, 243.00, 0.00, 0.00, '2012-10-03', '2025-03-09', '2025-03-09', 5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 6: Customer 6 (acctdata.txt line 6)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (6, '00000000006', '00000000006', 'Y', 21.80, 358.40, 294.80, '2017-12-23', '2025-10-08', '2025-10-08', 6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (6, '00000000006', 'Y', 21.80, 358.40, 294.80, 0.00, 0.00, '2017-12-23', '2025-10-08', '2025-10-08', 6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 7: Customer 7 (acctdata.txt line 7)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (7, '00000000007', '00000000007', 'Y', 19.30, 206.50, 26.40, '2012-10-12', '2024-12-13', '2024-12-13', 7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (7, '00000000007', 'Y', 19.30, 206.50, 26.40, 0.00, 0.00, '2012-10-12', '2024-12-13', '2024-12-13', 7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 8: Customer 8 (acctdata.txt line 8)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (8, '00000000008', '00000000008', 'Y', 60.50, 610.40, 131.80, '2012-01-04', '2024-05-20', '2024-05-20', 8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (8, '00000000008', 'Y', 60.50, 610.40, 131.80, 0.00, 0.00, '2012-01-04', '2024-05-20', '2024-05-20', 8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 9: Customer 9 (acctdata.txt line 9)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (9, '00000000009', '00000000009', 'Y', 56.00, 820.10, 206.50, '2016-08-27', '2024-12-27', '2024-12-27', 9, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (9, '00000000009', 'Y', 56.00, 820.10, 206.50, 0.00, 0.00, '2016-08-27', '2024-12-27', '2024-12-27', 9, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 10: Customer 10 (acctdata.txt line 10)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (10, '00000000010', '00000000010', 'Y', 15.90, 540.10, 444.20, '2015-09-13', '2023-01-27', '2023-01-27', 10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (10, '00000000010', 'Y', 15.90, 540.10, 444.20, 0.00, 0.00, '2015-09-13', '2023-01-27', '2023-01-27', 10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 11: Customer 11 (acctdata.txt line 11)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (11, '00000000011', '00000000011', 'Y', 21.20, 499.80, 317.50, '2014-09-12', '2025-03-12', '2025-03-12', 11, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (11, '00000000011', 'Y', 21.20, 499.80, 317.50, 0.00, 0.00, '2014-09-12', '2025-03-12', '2025-03-12', 11, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 12: Customer 12 (acctdata.txt line 12)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (12, '00000000012', '00000000012', 'Y', 17.60, 463.60, 38.80, '2009-06-17', '2023-07-07', '2023-07-07', 12, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (12, '00000000012', 'Y', 17.60, 463.60, 38.80, 0.00, 0.00, '2009-06-17', '2023-07-07', '2023-07-07', 12, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 13: Customer 13 (acctdata.txt line 13)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (13, '00000000013', '00000000013', 'Y', 4.10, 754.20, 492.20, '2017-10-01', '2024-08-04', '2024-08-04', 13, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (13, '00000000013', 'Y', 4.10, 754.20, 492.20, 0.00, 0.00, '2017-10-01', '2024-08-04', '2024-08-04', 13, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 14: Customer 14 (acctdata.txt line 14)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (14, '00000000014', '00000000014', 'Y', 1.50, 225.40, 21.20, '2010-12-04', '2025-12-11', '2025-12-11', 14, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (14, '00000000014', 'Y', 1.50, 225.40, 21.20, 0.00, 0.00, '2010-12-04', '2025-12-11', '2025-12-11', 14, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 15: Customer 15 (acctdata.txt line 15)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (15, '00000000015', '00000000015', 'Y', 48.90, 844.10, 383.30, '2009-10-06', '2025-06-09', '2025-06-09', 15, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (15, '00000000015', 'Y', 48.90, 844.10, 383.30, 0.00, 0.00, '2009-10-06', '2025-06-09', '2025-06-09', 15, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 16: Customer 16 (acctdata.txt line 16)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (16, '00000000016', '00000000016', 'Y', 73.30, 892.20, 263.20, '2014-09-11', '2024-01-25', '2024-01-25', 16, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (16, '00000000016', 'Y', 73.30, 892.20, 263.20, 0.00, 0.00, '2014-09-11', '2024-01-25', '2024-01-25', 16, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 17: Customer 17 (acctdata.txt line 17)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (17, '00000000017', '00000000017', 'Y', 3.30, 56.80, 51.00, '2014-05-17', '2025-03-01', '2025-03-01', 17, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (17, '00000000017', 'Y', 3.30, 56.80, 51.00, 0.00, 0.00, '2014-05-17', '2025-03-01', '2025-03-01', 17, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 18: Customer 18 (acctdata.txt line 18)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (18, '00000000018', '00000000018', 'Y', 14.40, 290.30, 149.60, '2018-11-15', '2023-09-10', '2023-09-10', 18, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (18, '00000000018', 'Y', 14.40, 290.30, 149.60, 0.00, 0.00, '2018-11-15', '2023-09-10', '2023-09-10', 18, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 19: Customer 19 (acctdata.txt line 19)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (19, '00000000019', '00000000019', 'Y', 48.00, 698.60, 372.30, '2011-12-14', '2025-07-23', '2025-07-23', 19, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (19, '00000000019', 'Y', 48.00, 698.60, 372.30, 0.00, 0.00, '2011-12-14', '2025-07-23', '2025-07-23', 19, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 20: Customer 20 (acctdata.txt line 20)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (20, '00000000020', '00000000020', 'Y', 36.90, 376.70, 104.00, '2014-02-27', '2024-03-13', '2024-03-13', 20, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (20, '00000000020', 'Y', 36.90, 376.70, 104.00, 0.00, 0.00, '2014-02-27', '2024-03-13', '2024-03-13', 20, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 21: Customer 21 (acctdata.txt line 21)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (21, '00000000021', '00000000021', 'Y', 11.20, 126.40, 18.00, '2011-10-19', '2023-01-06', '2023-01-06', 21, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (21, '00000000021', 'Y', 11.20, 126.40, 18.00, 0.00, 0.00, '2011-10-19', '2023-01-06', '2023-01-06', 21, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 22: Customer 22 (acctdata.txt line 22)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (22, '00000000022', '00000000022', 'Y', 5.50, 859.90, 471.20, '2016-11-21', '2025-12-28', '2025-12-28', 22, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (22, '00000000022', 'Y', 5.50, 859.90, 471.20, 0.00, 0.00, '2016-11-21', '2025-12-28', '2025-12-28', 22, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 23: Customer 23 (acctdata.txt line 23)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (23, '00000000023', '00000000023', 'Y', 10.40, 337.70, 290.40, '2012-03-15', '2025-03-18', '2025-03-18', 23, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (23, '00000000023', 'Y', 10.40, 337.70, 290.40, 0.00, 0.00, '2012-03-15', '2025-03-18', '2025-03-18', 23, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 24: Customer 24 (acctdata.txt line 24)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (24, '00000000024', '00000000024', 'Y', 40.00, 517.40, 412.90, '2015-08-08', '2025-02-11', '2025-02-11', 24, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (24, '00000000024', 'Y', 40.00, 517.40, 412.90, 0.00, 0.00, '2015-08-08', '2025-02-11', '2025-02-11', 24, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 25: Customer 25 (acctdata.txt line 25)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (25, '00000000025', '00000000025', 'Y', 6.10, 819.40, 658.20, '2012-10-26', '2025-07-10', '2025-07-10', 25, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (25, '00000000025', 'Y', 6.10, 819.40, 658.20, 0.00, 0.00, '2012-10-26', '2025-07-10', '2025-07-10', 25, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 26: Customer 26 (acctdata.txt line 26)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (26, '00000000026', '00000000026', 'Y', 4.60, 218.10, 137.50, '2009-04-20', '2024-12-19', '2024-12-19', 26, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (26, '00000000026', 'Y', 4.60, 218.10, 137.50, 0.00, 0.00, '2009-04-20', '2024-12-19', '2024-12-19', 26, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 27: Customer 27 (acctdata.txt line 27)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (27, '00000000027', '00000000027', 'Y', 28.40, 557.20, 207.50, '2012-09-30', '2025-07-13', '2025-07-13', 27, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (27, '00000000027', 'Y', 28.40, 557.20, 207.50, 0.00, 0.00, '2012-09-30', '2025-07-13', '2025-07-13', 27, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 28: Customer 28 (acctdata.txt line 28)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (28, '00000000028', '00000000028', 'Y', 6.80, 86.80, 54.70, '2015-05-20', '2024-05-09', '2024-05-09', 28, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (28, '00000000028', 'Y', 6.80, 86.80, 54.70, 0.00, 0.00, '2015-05-20', '2024-05-09', '2024-05-09', 28, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 29: Customer 29 (acctdata.txt line 29)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (29, '00000000029', '00000000029', 'Y', 33.90, 551.10, 436.10, '2015-11-03', '2024-06-04', '2024-06-04', 29, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (29, '00000000029', 'Y', 33.90, 551.10, 436.10, 0.00, 0.00, '2015-11-03', '2024-06-04', '2024-06-04', 29, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 30: Customer 30 (acctdata.txt line 30)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (30, '00000000030', '00000000030', 'Y', 0.20, 12.00, 9.30, '2011-08-26', '2024-06-27', '2024-06-27', 30, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (30, '00000000030', 'Y', 0.20, 12.00, 9.30, 0.00, 0.00, '2011-08-26', '2024-06-27', '2024-06-27', 30, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 31: Customer 31 (acctdata.txt line 31)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (31, '00000000031', '00000000031', 'Y', 3.10, 114.00, 107.70, '2017-02-25', '2025-06-08', '2025-06-08', 31, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (31, '00000000031', 'Y', 3.10, 114.00, 107.70, 0.00, 0.00, '2017-02-25', '2025-06-08', '2025-06-08', 31, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 32: Customer 32 (acctdata.txt line 32)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (32, '00000000032', '00000000032', 'Y', 3.00, 117.50, 84.60, '2013-11-10', '2025-05-19', '2025-05-19', 32, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (32, '00000000032', 'Y', 3.00, 117.50, 84.60, 0.00, 0.00, '2013-11-10', '2025-05-19', '2025-05-19', 32, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 33: Customer 33 (acctdata.txt line 33)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (33, '00000000033', '00000000033', 'Y', 41.00, 640.40, 95.10, '2012-10-11', '2025-10-07', '2025-10-07', 33, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (33, '00000000033', 'Y', 41.00, 640.40, 95.10, 0.00, 0.00, '2012-10-11', '2025-10-07', '2025-10-07', 33, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 34: Customer 34 (acctdata.txt line 34)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (34, '00000000034', '00000000034', 'Y', 25.30, 364.20, 277.00, '2009-05-10', '2025-10-06', '2025-10-06', 34, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (34, '00000000034', 'Y', 25.30, 364.20, 277.00, 0.00, 0.00, '2009-05-10', '2025-10-06', '2025-10-06', 34, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 35: Customer 35 (acctdata.txt line 35)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (35, '00000000035', '00000000035', 'Y', 16.60, 194.70, 152.50, '2018-02-02', '2025-09-23', '2025-09-23', 35, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (35, '00000000035', 'Y', 16.60, 194.70, 152.50, 0.00, 0.00, '2018-02-02', '2025-09-23', '2025-09-23', 35, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 36: Customer 36 (acctdata.txt line 36)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (36, '00000000036', '00000000036', 'Y', 11.00, 332.80, 83.90, '2018-07-18', '2024-12-23', '2024-12-23', 36, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (36, '00000000036', 'Y', 11.00, 332.80, 83.90, 0.00, 0.00, '2018-07-18', '2024-12-23', '2024-12-23', 36, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 37: Customer 37 (acctdata.txt line 37)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (37, '00000000037', '00000000037', 'Y', 0.70, 44.60, 16.60, '2016-09-10', '2023-10-24', '2023-10-24', 37, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (37, '00000000037', 'Y', 0.70, 44.60, 16.60, 0.00, 0.00, '2016-09-10', '2023-10-24', '2023-10-24', 37, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 38: Customer 38 (acctdata.txt line 38)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (38, '00000000038', '00000000038', 'Y', 61.20, 650.50, 347.60, '2010-08-12', '2023-07-23', '2023-07-23', 38, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (38, '00000000038', 'Y', 61.20, 650.50, 347.60, 0.00, 0.00, '2010-08-12', '2023-07-23', '2023-07-23', 38, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 39: Customer 39 (acctdata.txt line 39)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (39, '00000000039', '00000000039', 'Y', 84.30, 975.00, 621.20, '2018-08-26', '2025-09-08', '2025-09-08', 39, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (39, '00000000039', 'Y', 84.30, 975.00, 621.20, 0.00, 0.00, '2018-08-26', '2025-09-08', '2025-09-08', 39, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 40: Customer 40 (acctdata.txt line 40)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (40, '00000000040', '00000000040', 'Y', 4.30, 582.30, 167.40, '2010-02-13', '2023-10-27', '2023-10-27', 40, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (40, '00000000040', 'Y', 4.30, 582.30, 167.40, 0.00, 0.00, '2010-02-13', '2023-10-27', '2023-10-27', 40, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 41: Customer 41 (acctdata.txt line 41)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (41, '00000000041', '00000000041', 'Y', 37.50, 672.10, 342.90, '2015-02-07', '2023-04-24', '2023-04-24', 41, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (41, '00000000041', 'Y', 37.50, 672.10, 342.90, 0.00, 0.00, '2015-02-07', '2023-04-24', '2023-04-24', 41, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 42: Customer 42 (acctdata.txt line 42)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (42, '00000000042', '00000000042', 'Y', 30.20, 656.30, 510.30, '2016-09-19', '2025-09-19', '2025-09-19', 42, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (42, '00000000042', 'Y', 30.20, 656.30, 510.30, 0.00, 0.00, '2016-09-19', '2025-09-19', '2025-09-19', 42, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 43: Customer 43 (acctdata.txt line 43)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (43, '00000000043', '00000000043', 'Y', 61.00, 616.80, 120.60, '2012-04-09', '2025-08-29', '2025-08-29', 43, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (43, '00000000043', 'Y', 61.00, 616.80, 120.60, 0.00, 0.00, '2012-04-09', '2025-08-29', '2025-08-29', 43, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 44: Customer 44 (acctdata.txt line 44)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (44, '00000000044', '00000000044', 'Y', 26.30, 689.90, 443.20, '2018-12-01', '2024-01-17', '2024-01-17', 44, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (44, '00000000044', 'Y', 26.30, 689.90, 443.20, 0.00, 0.00, '2018-12-01', '2024-01-17', '2024-01-17', 44, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 45: Customer 45 (acctdata.txt line 45)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (45, '00000000045', '00000000045', 'Y', 18.60, 271.90, 68.80, '2010-12-31', '2025-07-09', '2025-07-09', 45, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (45, '00000000045', 'Y', 18.60, 271.90, 68.80, 0.00, 0.00, '2010-12-31', '2025-07-09', '2025-07-09', 45, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 46: Customer 46 (acctdata.txt line 46)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (46, '00000000046', '00000000046', 'Y', 39.60, 700.70, 543.80, '2013-09-06', '2025-06-20', '2025-06-20', 46, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (46, '00000000046', 'Y', 39.60, 700.70, 543.80, 0.00, 0.00, '2013-09-06', '2025-06-20', '2025-06-20', 46, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 47: Customer 47 (acctdata.txt line 47)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (47, '00000000047', '00000000047', 'Y', 3.20, 233.80, 15.90, '2014-04-03', '2025-08-23', '2025-08-23', 47, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (47, '00000000047', 'Y', 3.20, 233.80, 15.90, 0.00, 0.00, '2014-04-03', '2025-08-23', '2025-08-23', 47, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 48: Customer 48 (acctdata.txt line 48)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (48, '00000000048', '00000000048', 'Y', 22.60, 230.60, 61.20, '2017-03-18', '2025-02-06', '2025-02-06', 48, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (48, '00000000048', 'Y', 22.60, 230.60, 61.20, 0.00, 0.00, '2017-03-18', '2025-02-06', '2025-02-06', 48, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 49: Customer 49 (acctdata.txt line 49)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (49, '00000000049', '00000000049', 'Y', 10.00, 904.80, 480.70, '2019-04-06', '2023-09-17', '2023-09-17', 49, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (49, '00000000049', 'Y', 10.00, 904.80, 480.70, 0.00, 0.00, '2019-04-06', '2023-09-17', '2023-09-17', 49, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Account 50: Customer 50 (acctdata.txt line 50)
-INSERT INTO account (account_id, acct_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
-VALUES (50, '00000000050', '00000000050', 'Y', 49.20, 616.90, 458.70, '2011-04-22', '2023-03-09', '2023-03-09', 50, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+INSERT INTO account (account_id, account_number, active_status, current_balance, credit_limit, cash_credit_limit, current_cycle_credit, current_cycle_debit, open_date, expiration_date, reissue_date, customer_id, created_at, updated_at, version)
+VALUES (50, '00000000050', 'Y', 49.20, 616.90, 458.70, 0.00, 0.00, '2011-04-22', '2023-03-09', '2023-03-09', 50, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- =============================================================================
 -- Test Data Summary
@@ -453,3 +453,8 @@ VALUES (50, '00000000050', '00000000050', 'Y', 49.20, 616.90, 458.70, '2011-04-2
 --   - Interest calculation batch jobs (CBACT04C.cbl)
 --   - Customer relationship queries and validations
 -- =============================================================================
+
+-- Reset sequences to avoid primary key collisions in tests
+-- H2 syntax for restarting IDENTITY sequences after bulk data loading
+ALTER TABLE customer ALTER COLUMN customer_id RESTART WITH 51;
+ALTER TABLE account ALTER COLUMN account_id RESTART WITH 51;

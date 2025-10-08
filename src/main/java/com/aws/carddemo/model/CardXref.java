@@ -210,7 +210,7 @@ import java.io.Serializable;
 @NoArgsConstructor
 @AllArgsConstructor
 @SuperBuilder
-@ToString(callSuper = true, exclude = {"cardNumber", "customer", "account"})
+@ToString(callSuper = true)
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 public class CardXref extends BaseEntity implements Serializable {
 
