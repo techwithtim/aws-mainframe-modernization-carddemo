@@ -297,7 +297,7 @@ CREATE TABLE transaction_type (
     type_code VARCHAR(2) NOT NULL UNIQUE,
     
     -- Description (from TRAN-TYPE-DESC PIC X(50))
-    type_desc VARCHAR(50) NOT NULL,
+    type_description VARCHAR(50) NOT NULL,
     
     -- Audit Columns
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -429,19 +429,19 @@ COMMENT ON COLUMN transaction.processing_timestamp IS 'Timestamp when transactio
 -- ================================================================
 CREATE TABLE daily_transaction (
     -- Primary Key (generated identity)
-    daily_tran_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    daily_transaction_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     
     -- Business Key (from DALYTRAN-ID PIC X(16))
-    tran_id VARCHAR(16) NOT NULL,
+    transaction_id VARCHAR(16) NOT NULL,
     
     -- Transaction Classification (from DALYTRAN-TYPE-CD, DALYTRAN-CAT-CD)
-    type_code VARCHAR(2) NOT NULL,
-    category_code VARCHAR(4) NOT NULL,
+    transaction_type_code VARCHAR(2) NOT NULL,
+    transaction_category_code VARCHAR(4) NOT NULL,
     
     -- Transaction Details (from DALYTRAN-SOURCE, DALYTRAN-DESC, DALYTRAN-AMT)
-    tran_source VARCHAR(10),
-    tran_desc VARCHAR(100),
-    tran_amt NUMERIC(11, 2) NOT NULL,
+    transaction_source VARCHAR(10),
+    description VARCHAR(100),
+    amount NUMERIC(11, 2) NOT NULL,
     
     -- Merchant Information (from DALYTRAN-MERCHANT-ID, DALYTRAN-MERCHANT-NAME, etc.)
     merchant_id VARCHAR(9),
@@ -466,9 +466,9 @@ CREATE TABLE daily_transaction (
     error_message VARCHAR(255),
     
     -- Foreign Key Constraints (referential integrity for classification)
-    CONSTRAINT fk_daily_tran_type FOREIGN KEY (type_code) 
+    CONSTRAINT fk_daily_tran_type FOREIGN KEY (transaction_type_code) 
         REFERENCES transaction_type(type_code) ON DELETE RESTRICT,
-    CONSTRAINT fk_daily_tran_category FOREIGN KEY (type_code, category_code) 
+    CONSTRAINT fk_daily_tran_category FOREIGN KEY (transaction_type_code, transaction_category_code) 
         REFERENCES transaction_category(type_code, category_code) ON DELETE RESTRICT,
     
     -- Audit Columns
@@ -477,8 +477,8 @@ CREATE TABLE daily_transaction (
     version INTEGER NOT NULL DEFAULT 0
 );
 
--- Index on tran_id for duplicate detection
-CREATE INDEX idx_daily_tran_id ON daily_transaction(tran_id);
+-- Index on transaction_id for duplicate detection
+CREATE INDEX idx_daily_tran_id ON daily_transaction(transaction_id);
 
 -- Index on card_number for card-to-account lookup during batch processing
 CREATE INDEX idx_daily_tran_card_number ON daily_transaction(card_number);
@@ -617,7 +617,7 @@ CREATE TABLE app_user (
     failed_login_attempts INTEGER NOT NULL DEFAULT 0 CHECK (failed_login_attempts >= 0),
     
     -- Last login timestamp for audit trail
-    last_login_at TIMESTAMP,
+    last_login TIMESTAMP,
     
     -- Password expiration for periodic rotation policy
     password_expires_at TIMESTAMP,

@@ -1,9 +1,11 @@
 -- ============================================================================
--- Flyway Migration V2: Create Performance Indexes
+-- Flyway Migration V2: Create Additional Performance Indexes
 -- ============================================================================
--- Description: Creates strategic B-tree indexes on PostgreSQL database schema
---              to optimize query performance for common access patterns derived
---              from legacy COBOL VSAM file operations.
+-- Description: Creates additional strategic B-tree indexes to complement the
+--              indexes already created in V1__create_tables.sql
+--
+-- NOTE: V1__create_tables.sql already creates 33 indexes on core tables.
+--       This migration adds ONLY non-duplicate indexes for specific use cases.
 --
 -- Migration from: COBOL programs accessing VSAM KSDS files with primary keys
 --                 and AIX (Alternate Index) paths
@@ -22,267 +24,134 @@
 -- ============================================================================
 
 -- ============================================================================
--- ACCOUNT TABLE INDEXES
+-- ACCOUNT TABLE ADDITIONAL INDEXES
 -- ============================================================================
--- Replaces VSAM ACCTFILE alternate index paths and READ operations
 
--- Index for findByCustomerId repository queries
--- Supports: Account lookup by customer (COBOL: READ ACCTFILE by customer relationship)
--- Usage: GET /api/v1/customers/{id}/accounts
-CREATE INDEX idx_account_customer 
-ON account(customer_id);
-
--- Index for disclosure group joins during interest calculation
--- Supports: CBACT04C.cbl interest calculation batch job
--- Usage: Batch job queries joining ACCOUNT with DISCLOSURE_GROUP
-CREATE INDEX idx_account_group 
-ON account(account_group_id);
-
--- Partial index for active accounts only (reduces index size by ~20%)
--- Supports: Queries filtering WHERE active_status='Y'
--- Usage: Most account queries exclude inactive accounts
-CREATE INDEX idx_account_status 
-ON account(account_group_id) 
-WHERE active_status = 'Y';
-
--- Unique index on business key (account number)
--- Enforces: One account per account number across all customers
--- Supports: findByAccountNumber repository query
-CREATE UNIQUE INDEX idx_account_number_unique 
-ON account(account_number);
+-- Partial index for active accounts with group filtering
+-- Supports: Interest calculation queries filtering active accounts by group
+-- Usage: WHERE active_status = 'A' AND group_id = ?
+-- NOTE: V1 already has idx_account_active_status and idx_account_group_id
+--       This composite partial index optimizes the common combined query
+CREATE INDEX idx_account_active_group 
+ON account(group_id, active_status) 
+WHERE active_status = 'A';
 
 -- Index for account opening date range queries
 -- Supports: Reporting queries filtering by account age
--- Usage: Analytics and compliance reporting
+-- Usage: Analytics and compliance reporting (WHERE open_date BETWEEN ? AND ?)
 CREATE INDEX idx_account_open_date 
-ON account(account_open_date);
+ON account(open_date);
 
 
 -- ============================================================================
--- CARD TABLE INDEXES
+-- CARD TABLE ADDITIONAL INDEXES
 -- ============================================================================
--- Replaces VSAM CARDFILE and alternate index CXACAIX
+-- NOTE: V1 already has idx_card_number, idx_card_account_id, idx_card_active_status
 
--- Index for account-to-cards navigation (critical for card list operations)
--- Supports: COCRDLIC.cbl card list browse by account
--- Usage: GET /api/v1/accounts/{id}/cards
--- Replaces: VSAM AIX path CXACAIX (Card Cross-reference Account Index)
-CREATE INDEX idx_card_account 
-ON card(account_id);
-
--- Partial index for expired card detection (active cards only)
+-- Partial index for active card expiration monitoring
 -- Supports: Expiration notification batch job and card validation
--- Usage: Daily batch job identifying cards expiring in next 30 days
-CREATE INDEX idx_card_expiration 
+-- Usage: Daily batch job identifying cards expiring soon (WHERE active_status = 'A' AND expiration_date < ?)
+-- Reduces index size by excluding inactive cards (~30% reduction)
+CREATE INDEX idx_card_active_expiration 
 ON card(expiration_date) 
-WHERE active_status = 'Y';
-
--- Unique index on business key (card number)
--- Enforces: One card per card number across all accounts
--- Supports: findByCardNumber repository query and COBOL READ CARDFILE by key
-CREATE UNIQUE INDEX idx_card_number_unique 
-ON card(card_number);
-
--- Index for card type filtering
--- Supports: Queries filtering by card type (Debit, Credit, etc.)
--- Usage: Card type analytics and reporting
-CREATE INDEX idx_card_type 
-ON card(card_type);
+WHERE active_status = 'A';
 
 
 -- ============================================================================
--- TRANSACTION TABLE INDEXES
+-- TRANSACTION TABLE ADDITIONAL INDEXES
 -- ============================================================================
--- Critical indexes for transaction history queries (highest query volume)
+-- NOTE: V1 already has idx_tran_id, idx_tran_account_id, idx_tran_card_number,
+--       idx_tran_orig_timestamp, idx_tran_classification
 
--- Composite index for paginated transaction history (MOST CRITICAL INDEX)
+-- Composite index for paginated transaction history (CRITICAL FOR API PERFORMANCE)
 -- Supports: COTRN00C.cbl transaction list browse with pagination
 -- Usage: GET /api/v1/accounts/{id}/transactions?page=0&size=20
--- Query pattern: WHERE account_id = ? ORDER BY processing_timestamp DESC
--- Performance: Enables index-only scans for transaction list queries
-CREATE INDEX idx_transaction_account_date 
-ON transaction(account_id, processing_timestamp DESC);
-
--- Index for card-based transaction lookup
--- Supports: Transaction lookup by card number for dispute resolution
--- Usage: GET /api/v1/cards/{cardNumber}/transactions
--- Replaces: COBOL READ TRANFILE with card number filter
-CREATE INDEX idx_transaction_card 
-ON transaction(card_number);
+-- Query pattern: WHERE account_id = ? ORDER BY original_timestamp DESC
+-- Performance: Enables index-only scans, covers both filter and sort
+-- V1's idx_tran_account_id doesn't cover the ORDER BY, this composite index does
+CREATE INDEX idx_transaction_account_timestamp 
+ON transaction(account_id, original_timestamp DESC);
 
 -- Index for merchant reconciliation analytics
 -- Supports: Merchant transaction aggregation and reporting
--- Usage: Batch reporting queries grouping by merchant_id
+-- Usage: Batch reporting queries grouping by merchant_id (WHERE merchant_id = ?)
 CREATE INDEX idx_transaction_merchant 
 ON transaction(merchant_id);
 
--- Composite index for transaction type and category reporting
--- Supports: CBACT04C.cbl interest calculation category lookups
--- Usage: Interest calculation batch job joining transaction categories
-CREATE INDEX idx_transaction_type_category 
-ON transaction(transaction_type_code, transaction_category_code);
-
--- Index for transaction date range queries (reporting and analytics)
--- Supports: Monthly statement generation and date range reports
--- Usage: SELECT * FROM transaction WHERE processing_timestamp BETWEEN ? AND ?
-CREATE INDEX idx_transaction_date_range 
-ON transaction(processing_timestamp);
-
 -- Index for transaction source filtering
 -- Supports: Queries filtering by transaction source (Online, POS, ATM, etc.)
--- Usage: Channel analytics and fraud detection
+-- Usage: Channel analytics and fraud detection (WHERE tran_source = ?)
 CREATE INDEX idx_transaction_source 
-ON transaction(transaction_source);
+ON transaction(tran_source);
 
 
 -- ============================================================================
--- CARD_XREF TABLE INDEXES
+-- CARD_XREF TABLE ADDITIONAL INDEXES
 -- ============================================================================
--- Bidirectional navigation between cards, accounts, and customers
--- Replaces VSAM XREFFILE with multiple access paths
+-- NOTE: V1 already has idx_xref_card_number, idx_xref_cust_id, idx_xref_acct_id
+--       and unique constraint uq_xref_card_number
 
--- Index for account-to-card cross-reference lookup
--- Supports: CBTRN01C.cbl transaction posting (card → account lookup)
--- Usage: Batch job resolving card number to account ID
--- Replaces: COBOL READ XREFFILE by card number
-CREATE INDEX idx_xref_account 
-ON card_xref(account_id);
-
--- Index for customer-to-card cross-reference lookup
--- Supports: Customer card list queries
--- Usage: GET /api/v1/customers/{id}/cards (via cross-reference)
-CREATE INDEX idx_xref_customer 
-ON card_xref(customer_id);
-
--- Unique composite index enforcing one card-account relationship
--- Enforces: A card can only be linked to one account
--- Supports: Referential integrity for card-account binding
-CREATE UNIQUE INDEX idx_xref_card_account_unique 
-ON card_xref(card_number, account_id);
+-- No additional indexes needed for card_xref - V1 provides complete coverage
 
 
 -- ============================================================================
--- CUSTOMER TABLE INDEXES
+-- CUSTOMER TABLE ADDITIONAL INDEXES
 -- ============================================================================
--- Customer lookup and search indexes
-
--- Unique index on business key (SSN) with partial index for privacy
--- Enforces: One customer per SSN (for US customers)
--- Security: SSN is encrypted at rest, index supports lookups
-CREATE UNIQUE INDEX idx_customer_ssn_unique 
-ON customer(customer_ssn) 
-WHERE customer_ssn IS NOT NULL;
-
--- Index for customer last name search (common search pattern)
--- Supports: Customer search by last name
--- Usage: GET /api/v1/customers?lastName={name}
-CREATE INDEX idx_customer_lastname 
-ON customer(customer_last_name);
-
--- Composite index for full name search (first + last name)
--- Supports: Customer search by full name
--- Usage: Advanced customer search with first and last name
-CREATE INDEX idx_customer_fullname 
-ON customer(customer_last_name, customer_first_name);
+-- NOTE: V1 already has idx_customer_cust_id, idx_customer_ssn, idx_customer_name
 
 -- Index for FICO score range queries
 -- Supports: Credit risk analytics and account eligibility checks
--- Usage: Reporting queries filtering by credit score ranges
+-- Usage: Reporting queries filtering by credit score ranges (WHERE fico_credit_score BETWEEN ? AND ?)
 CREATE INDEX idx_customer_fico 
 ON customer(fico_credit_score);
 
 
 -- ============================================================================
--- DAILY_TRANSACTION TABLE INDEXES
+-- DAILY_TRANSACTION TABLE ADDITIONAL INDEXES
 -- ============================================================================
--- Indexes for batch processing input (transaction posting batch job)
+-- NOTE: V1 already has idx_daily_tran_id, idx_daily_tran_card_number,
+--       idx_daily_tran_status, idx_daily_tran_timestamp
 
--- Index for unprocessed transaction detection
--- Supports: CBTRN01C.cbl batch job identifying pending transactions
--- Usage: SELECT * FROM daily_transaction WHERE processed_flag = 'N'
-CREATE INDEX idx_daily_transaction_processed 
-ON daily_transaction(processed_flag) 
-WHERE processed_flag = 'N';
-
--- Composite index for date + card number (batch processing order)
--- Supports: Sequential processing of daily feed by date and card
--- Usage: Batch job processing transactions in chronological order per card
-CREATE INDEX idx_daily_transaction_date_card 
-ON daily_transaction(transaction_date, card_number);
+-- Composite index for chronological batch processing per card
+-- Supports: Sequential processing of daily feed by timestamp and card
+-- Usage: Batch job processing transactions in order (WHERE card_number = ? ORDER BY original_timestamp)
+-- Complements V1's separate single-column indexes with a composite for better performance
+CREATE INDEX idx_daily_transaction_card_timestamp 
+ON daily_transaction(card_number, original_timestamp);
 
 
 -- ============================================================================
--- TRANSACTION_CATEGORY_BALANCE TABLE INDEXES
+-- TRANSACTION_CATEGORY_BALANCE TABLE ADDITIONAL INDEXES
 -- ============================================================================
--- Indexes for interest calculation batch job
+-- NOTE: V1 already has idx_cat_bal_account_id and idx_cat_bal_composite
+--       which covers (account_id, type_code, category_code)
 
--- Composite index for account + category balance lookups
--- Supports: CBACT04C.cbl interest calculation reading category balances
--- Usage: Interest calculation batch job querying balances by account and category
--- Replaces: COBOL READ TCATBAL by account-category composite key
-CREATE INDEX idx_catbal_account_category 
-ON transaction_category_balance(account_id, transaction_category_code);
-
--- Index for category-based aggregation queries
--- Supports: Reporting queries aggregating balances by category
-CREATE INDEX idx_catbal_category 
-ON transaction_category_balance(transaction_category_code);
+-- No additional indexes needed - V1's composite index provides full coverage
 
 
 -- ============================================================================
--- DISCLOSURE_GROUP TABLE INDEXES
+-- DISCLOSURE_GROUP TABLE ADDITIONAL INDEXES
 -- ============================================================================
--- Reference data indexes for interest rate lookups
+-- NOTE: V1 already has idx_disclosure_group_id and idx_disclosure_composite
 
--- Index for account group lookup during interest calculation
--- Supports: CBACT04C.cbl interest rate determination
--- Usage: Interest calculation batch job joining on account_group_id
-CREATE INDEX idx_disclosure_group 
-ON disclosure_group(account_group_id);
+-- No additional indexes needed - V1 provides full coverage
 
 
 -- ============================================================================
--- APP_USER TABLE INDEXES
+-- APP_USER TABLE ADDITIONAL INDEXES
 -- ============================================================================
--- User authentication and authorization indexes
+-- NOTE: V1 already has idx_user_username, idx_user_type, idx_user_locked
 
--- Unique index on username (critical for authentication performance)
--- Supports: COSGN00C.cbl login operation (user credential lookup)
--- Usage: POST /api/v1/auth/login (username lookup for authentication)
--- Performance: Enables <10ms authentication queries
-CREATE UNIQUE INDEX idx_user_username_unique 
-ON app_user(username);
-
--- Index for user type filtering (role-based queries)
--- Supports: Admin user list queries filtering by user type
--- Usage: GET /api/v1/admin/users?userType=ADMIN
-CREATE INDEX idx_user_type 
-ON app_user(user_type);
-
--- Partial index for active users only
--- Supports: Authentication queries (only active users can log in)
--- Usage: Login queries with WHERE active_status = 'Y'
-CREATE INDEX idx_user_active 
-ON app_user(user_type) 
-WHERE active_status = 'Y';
+-- No additional indexes needed - V1 provides full coverage
 
 
 -- ============================================================================
--- REFERENCE DATA TABLE INDEXES
+-- REFERENCE DATA TABLE ADDITIONAL INDEXES
 -- ============================================================================
--- Indexes for transaction type and category reference tables
+-- NOTE: V1 already has idx_tran_type_code, idx_tran_cat_type_code, idx_tran_cat_composite
+--       with unique constraints on natural keys
 
--- Unique index on transaction type code (natural key)
--- Supports: Fast lookup of transaction type metadata
--- Usage: Transaction processing validating type codes
-CREATE UNIQUE INDEX idx_transaction_type_code_unique 
-ON transaction_type(transaction_type_code);
-
--- Unique index on transaction category code (natural key)
--- Supports: Fast lookup of transaction category metadata
--- Usage: Transaction processing validating category codes
-CREATE UNIQUE INDEX idx_transaction_category_code_unique 
-ON transaction_category(transaction_category_code);
+-- No additional indexes needed - V1 provides full coverage
 
 
 -- ============================================================================

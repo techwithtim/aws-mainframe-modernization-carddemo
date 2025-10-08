@@ -57,7 +57,7 @@ INSERT INTO transaction_type (type_code, type_description) VALUES
 --   Type 07 (Adjustment): 1 category (0001)
 
 -- Type 01: Purchase Categories
-INSERT INTO transaction_category (transaction_type_code, category_code, category_description) VALUES
+INSERT INTO transaction_category (type_code, category_code, category_desc) VALUES
 ('01', '0001', 'Regular Sales Draft'),
 ('01', '0002', 'Regular Cash Advance'),
 ('01', '0003', 'Convenience Check Debit'),
@@ -65,34 +65,34 @@ INSERT INTO transaction_category (transaction_type_code, category_code, category
 ('01', '0005', 'Interest Amount');
 
 -- Type 02: Payment Categories
-INSERT INTO transaction_category (transaction_type_code, category_code, category_description) VALUES
+INSERT INTO transaction_category (type_code, category_code, category_desc) VALUES
 ('02', '0001', 'Cash payment'),
 ('02', '0002', 'Electronic payment'),
 ('02', '0003', 'Check payment');
 
 -- Type 03: Credit Categories
-INSERT INTO transaction_category (transaction_type_code, category_code, category_description) VALUES
+INSERT INTO transaction_category (type_code, category_code, category_desc) VALUES
 ('03', '0001', 'Credit to Account'),
 ('03', '0002', 'Credit to Purchase balance'),
 ('03', '0003', 'Credit to Cash balance');
 
 -- Type 04: Authorization Categories
-INSERT INTO transaction_category (transaction_type_code, category_code, category_description) VALUES
+INSERT INTO transaction_category (type_code, category_code, category_desc) VALUES
 ('04', '0001', 'Zero dollar authorization'),
 ('04', '0002', 'Online purchase authorization'),
 ('04', '0003', 'Travel booking authorization');
 
 -- Type 05: Refund Categories
-INSERT INTO transaction_category (transaction_type_code, category_code, category_description) VALUES
+INSERT INTO transaction_category (type_code, category_code, category_desc) VALUES
 ('05', '0001', 'Refund credit');
 
 -- Type 06: Reversal Categories
-INSERT INTO transaction_category (transaction_type_code, category_code, category_description) VALUES
+INSERT INTO transaction_category (type_code, category_code, category_desc) VALUES
 ('06', '0001', 'Fraud reversal'),
 ('06', '0002', 'Non-fraud reversal');
 
 -- Type 07: Adjustment Categories
-INSERT INTO transaction_category (transaction_type_code, category_code, category_description) VALUES
+INSERT INTO transaction_category (type_code, category_code, category_desc) VALUES
 ('07', '0001', 'Sales draft credit adjustment');
 
 -- =============================================================================
@@ -112,7 +112,7 @@ INSERT INTO transaction_category (transaction_type_code, category_code, category
 -- ================================
 -- Group A: Standard Interest Rates
 -- ================================
-INSERT INTO disclosure_group (account_group_id, transaction_type_code, transaction_category_code, interest_rate) VALUES
+INSERT INTO disclosure_group (account_group_id, type_code, category_code, interest_rate) VALUES
 -- Purchase Categories (Type 01)
 ('A', '01', '0001', 1.50),  -- Regular Sales Draft: 1.50% APR
 ('A', '01', '0002', 2.50),  -- Regular Cash Advance: 2.50% APR
@@ -141,7 +141,7 @@ INSERT INTO disclosure_group (account_group_id, transaction_type_code, transacti
 -- ====================================
 -- Group DEFAULT: Default Interest Rates
 -- ====================================
-INSERT INTO disclosure_group (account_group_id, transaction_type_code, transaction_category_code, interest_rate) VALUES
+INSERT INTO disclosure_group (account_group_id, type_code, category_code, interest_rate) VALUES
 -- Purchase Categories (Type 01)
 ('DEFAULT', '01', '0001', 1.50),  -- Regular Sales Draft: 1.50% APR
 ('DEFAULT', '01', '0002', 2.50),  -- Regular Cash Advance: 2.50% APR
@@ -170,7 +170,7 @@ INSERT INTO disclosure_group (account_group_id, transaction_type_code, transacti
 -- ====================================
 -- Group ZEROAPR: Promotional 0% APR
 -- ====================================
-INSERT INTO disclosure_group (account_group_id, transaction_type_code, transaction_category_code, interest_rate) VALUES
+INSERT INTO disclosure_group (account_group_id, type_code, category_code, interest_rate) VALUES
 -- All categories have 0% promotional APR
 -- Purchase Categories (Type 01)
 ('ZEROAPR', '01', '0001', 0.00),  -- Regular Sales Draft
