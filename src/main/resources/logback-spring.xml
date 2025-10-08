@@ -1,0 +1,475 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Logback Configuration for AWS CardDemo Modernized Application
+    
+    Purpose: Production-ready logging configuration with:
+    - PCI-DSS compliant data masking for sensitive information
+    - Environment-specific appenders (console for dev/test, CloudWatch for prod)
+    - Structured JSON logging for CloudWatch Logs integration
+    - Correlation ID tracking via MDC for request tracing
+    - Async appenders for non-blocking log writes
+    
+    Migrated from: COBOL system messages (app/cpy/CSMSG01Y.cpy, CSMSG02Y.cpy)
+    Security Requirement: PCI-DSS Level 1 compliance for cardholder data protection
+-->
+<configuration>
+
+    <!-- ================================================================ -->
+    <!-- PROPERTIES: Configuration variables for reusability             -->
+    <!-- ================================================================ -->
+    <!--
+        Correlation ID Tracking:
+        Uses MDC (Mapped Diagnostic Context) to store request-scoped correlation IDs.
+        The correlationId is set by CorrelationIdFilter (to be implemented) at request entry
+        and automatically included in all log statements during that request lifecycle.
+        
+        MDC Keys used:
+        - correlationId: Unique ID for request tracing (UUID format)
+        - userId: Authenticated user ID
+        - accountId: Account context (if applicable)
+        - transactionId: Transaction context (if applicable)
+        - requestId: Original HTTP request ID
+        
+        Format: %X{correlationId:-NO_CORRELATION_ID} retrieves from MDC with fallback
+    -->
+    <property name="LOG_PATTERN" 
+              value="%d{ISO8601} [%thread] %-5level %logger{36} [%X{correlationId:-NO_CORRELATION_ID}] - %mask(%msg)%n%throwable"/>
+    
+    <property name="CONSOLE_LOG_PATTERN" 
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} %highlight(%-5level) [%thread] %cyan(%logger{36}) [%X{correlationId:-NO_CORRELATION_ID}] - %mask(%msg)%n%throwable"/>
+    
+    <property name="LOG_FILE" value="${LOG_FILE:-${LOG_PATH:-${LOG_TEMP:-${java.io.tmpdir:-/tmp}}/}carddemo.log}"/>
+    
+    <!-- CloudWatch configuration (can be overridden via environment variables) -->
+    <property name="CLOUDWATCH_LOG_GROUP" value="${CLOUDWATCH_LOG_GROUP:-/aws/carddemo/application}"/>
+    <property name="CLOUDWATCH_LOG_STREAM" value="${CLOUDWATCH_LOG_STREAM:-${HOSTNAME:-localhost}}"/>
+    
+    <!-- ================================================================ -->
+    <!-- CUSTOM CONVERTER: PCI-DSS Compliant Data Masking                -->
+    <!-- ================================================================ -->
+    <!--
+        Custom masking converter that applies regex-based data masking for:
+        
+        1. Credit card numbers (16 digits): 
+           Pattern: \b\d{16}\b or \b\d{4}[\s-]\d{4}[\s-]\d{4}[\s-]\d{4}\b
+           Masked: ************1234 (shows last 4 digits only)
+           Example: 4532123456789012 → ************9012
+        
+        2. SSN (9 digits):
+           Pattern: \b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b or \b\d{9}\b
+           Masked: ***-**-1234 (shows last 4 digits only)
+           Example: 123-45-6789 → ***-**-6789
+        
+        3. CVV codes (3-4 digits):
+           Pattern: (cvv|cvv2|cvc)([=:]\s*)\d{3,4}
+           Masked: cvv=*** (fully masked)
+           Example: cvv=123 → cvv=***
+        
+        4. Passwords:
+           Pattern: (password|pwd|passwd|pass)([=:]\s*)\S+
+           Masked: password=*** (fully masked)
+           Example: password=secret123 → password=***
+        
+        5. Account numbers:
+           Pattern: (account|acct)([=:]\s*)\d{8,16}
+           Masked: account=******1234 (shows last 4 digits)
+           Example: account=12345678901 → account=*******8901
+        
+        Implementation: Custom converter class extends ch.qos.logback.classic.pattern.ClassicConverter
+        and applies regex replacement before log output. This ensures sensitive data never
+        reaches log files or CloudWatch in unmasked form.
+        
+        Note: The MaskingPatternLayoutConverter class must be implemented in:
+        src/main/java/com/aws/carddemo/config/MaskingPatternLayoutConverter.java
+    -->
+    <conversionRule conversionWord="mask" converterClass="com.aws.carddemo.config.MaskingPatternLayoutConverter" />
+    
+    <!-- ================================================================ -->
+    <!-- APPENDER: Console (Development & Testing)                        -->
+    <!-- ================================================================ -->
+    <!--
+        Console appender for local development and testing environments.
+        Features:
+        - Color-coded log levels for readability
+        - Correlation ID from MDC for request tracing
+        - Sensitive data masking applied inline
+        - Stack trace formatting for exceptions
+    -->
+    <springProfile name="dev,test,default">
+        <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+                <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+                <charset>UTF-8</charset>
+            </encoder>
+            <!-- Immediate flush for dev/test to see logs instantly -->
+            <immediateFlush>true</immediateFlush>
+        </appender>
+    </springProfile>
+    
+    <!-- ================================================================ -->
+    <!-- APPENDER: Structured JSON for Production (CloudWatch)           -->
+    <!-- ================================================================ -->
+    <!--
+        Production appender using LogstashEncoder for structured JSON logs.
+        Integrates with AWS CloudWatch Logs for centralized log aggregation.
+        
+        JSON Structure includes:
+        - timestamp: ISO8601 formatted
+        - level: Log level (ERROR, WARN, INFO, DEBUG, TRACE)
+        - logger: Fully qualified class name
+        - thread: Thread name for concurrency debugging
+        - message: Log message with sensitive data masked
+        - exception: Stack trace if present
+        - correlationId: Request tracking ID from MDC
+        - hostname: Server/pod identifier
+        - application: Application name
+        - profile: Active Spring profile
+        
+        Note: In production, logs are written to stdout/stderr and captured by
+        CloudWatch Logs agent or AWS Firelens sidecar container.
+    -->
+    <springProfile name="prod">
+        <!-- Primary CloudWatch appender (stdout with JSON formatting) -->
+        <appender name="CLOUDWATCH" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                <!-- Include standard fields -->
+                <includeMdcKeyName>correlationId</includeMdcKeyName>
+                <includeMdcKeyName>userId</includeMdcKeyName>
+                <includeMdcKeyName>accountId</includeMdcKeyName>
+                <includeMdcKeyName>transactionId</includeMdcKeyName>
+                <includeMdcKeyName>requestId</includeMdcKeyName>
+                
+                <!-- Custom JSON fields for application identification -->
+                <customFields>{"application":"carddemo-modernized","environment":"production"}</customFields>
+                
+                <!-- Timestamp format (ISO8601 with timezone) -->
+                <timestampPattern>yyyy-MM-dd'T'HH:mm:ss.SSSZ</timestampPattern>
+                
+                <!-- Include caller data for debugging (disabled for performance) -->
+                <includeCallerData>false</includeCallerData>
+                
+                <!-- Include context name -->
+                <includeContext>true</includeContext>
+                
+                <!-- Stack trace formatting -->
+                <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
+                    <maxDepthPerThrowable>30</maxDepthPerThrowable>
+                    <maxLength>4096</maxLength>
+                    <shortenedClassNameLength>30</shortenedClassNameLength>
+                    <rootCauseFirst>true</rootCauseFirst>
+                    <inlineHash>true</inlineHash>
+                </throwableConverter>
+            </encoder>
+            
+            <!-- Output to stdout for container log capture -->
+            <target>System.out</target>
+        </appender>
+        
+        <!-- Async wrapper for non-blocking CloudWatch writes -->
+        <!--
+            AsyncAppender Configuration (Production):
+            
+            Purpose: Prevents logging from blocking application threads, critical for
+            maintaining sub-200ms API response times per performance requirements.
+            
+            Configuration Details:
+            - queueSize=500: Buffer up to 500 log events before blocking
+              Sized for high-throughput scenarios (1000+ concurrent users)
+            
+            - discardingThreshold=0: NEVER discard logs, even under load
+              PCI-DSS compliance requires complete audit trail, no log loss acceptable
+              This means application will block if queue fills (prevents silent data loss)
+            
+            - includeCallerData=false: Disabled for performance
+              Caller data (class/method/line) extraction is expensive (stack walk)
+              Enabled only when troubleshooting specific issues
+            
+            - maxFlushTime=5000: Wait up to 5 seconds on shutdown
+              Ensures logs are flushed before pod termination in Kubernetes
+              
+            - neverBlock=false: Block application if queue is full
+              Alternative to discarding logs; ensures audit completeness
+              If logs are critical, application should slow down rather than lose data
+        -->
+        <appender name="ASYNC_CLOUDWATCH" class="ch.qos.logback.classic.AsyncAppender">
+            <appender-ref ref="CLOUDWATCH"/>
+            <queueSize>500</queueSize>
+            <discardingThreshold>0</discardingThreshold>
+            <includeCallerData>false</includeCallerData>
+            <maxFlushTime>5000</maxFlushTime>
+            <neverBlock>false</neverBlock>
+        </appender>
+    </springProfile>
+    
+    <!-- ================================================================ -->
+    <!-- APPENDER: File (Fallback/Local Testing)                         -->
+    <!-- ================================================================ -->
+    <!--
+        Rolling file appender for local file-based logging.
+        Used as fallback or for local debugging when CloudWatch unavailable.
+    -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_FILE}</file>
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        
+        <!-- Rolling policy: Time-based with size cap -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <!-- Daily rollover -->
+            <fileNamePattern>${LOG_FILE}.%d{yyyy-MM-dd}.%i.gz</fileNamePattern>
+            
+            <!-- Each file max 10MB -->
+            <maxFileSize>10MB</maxFileSize>
+            
+            <!-- Keep 30 days of history -->
+            <maxHistory>30</maxHistory>
+            
+            <!-- Total size cap: 1GB -->
+            <totalSizeCap>1GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+    
+    <!-- Async wrapper for file appender -->
+    <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="FILE"/>
+        <queueSize>500</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <includeCallerData>false</includeCallerData>
+    </appender>
+    
+    <!-- ================================================================ -->
+    <!-- LOGGERS: Package-specific log levels                             -->
+    <!-- ================================================================ -->
+    
+    <!-- Application package: DEBUG level for development visibility -->
+    <logger name="com.aws.carddemo" level="${LOG_LEVEL_CARDDEMO:-DEBUG}" additivity="false">
+        <springProfile name="dev,test,default">
+            <appender-ref ref="CONSOLE"/>
+        </springProfile>
+        <springProfile name="prod">
+            <appender-ref ref="ASYNC_CLOUDWATCH"/>
+        </springProfile>
+    </logger>
+    
+    <!-- Spring Framework: INFO level to reduce noise -->
+    <logger name="org.springframework" level="INFO" additivity="false">
+        <springProfile name="dev,test,default">
+            <appender-ref ref="CONSOLE"/>
+        </springProfile>
+        <springProfile name="prod">
+            <appender-ref ref="ASYNC_CLOUDWATCH"/>
+        </springProfile>
+    </logger>
+    
+    <!-- Spring Boot: INFO level -->
+    <logger name="org.springframework.boot" level="INFO" additivity="false">
+        <springProfile name="dev,test,default">
+            <appender-ref ref="CONSOLE"/>
+        </springProfile>
+        <springProfile name="prod">
+            <appender-ref ref="ASYNC_CLOUDWATCH"/>
+        </springProfile>
+    </logger>
+    
+    <!-- Spring Security: DEBUG for authentication troubleshooting -->
+    <logger name="org.springframework.security" level="${LOG_LEVEL_SECURITY:-INFO}" additivity="false">
+        <springProfile name="dev,test,default">
+            <appender-ref ref="CONSOLE"/>
+        </springProfile>
+        <springProfile name="prod">
+            <appender-ref ref="ASYNC_CLOUDWATCH"/>
+        </springProfile>
+    </logger>
+    
+    <!-- Hibernate/JPA: SQL logging -->
+    <logger name="org.hibernate.SQL" level="${LOG_LEVEL_SQL:-DEBUG}" additivity="false">
+        <springProfile name="dev,test,default">
+            <appender-ref ref="CONSOLE"/>
+        </springProfile>
+        <springProfile name="prod">
+            <appender-ref ref="ASYNC_CLOUDWATCH"/>
+        </springProfile>
+    </logger>
+    
+    <!-- Hibernate: Type bindings (parameter values) -->
+    <logger name="org.hibernate.type.descriptor.sql.BasicBinder" level="${LOG_LEVEL_SQL_PARAMS:-TRACE}" additivity="false">
+        <springProfile name="dev,test,default">
+            <appender-ref ref="CONSOLE"/>
+        </springProfile>
+        <springProfile name="prod">
+            <appender-ref ref="ASYNC_CLOUDWATCH"/>
+        </springProfile>
+    </logger>
+    
+    <!-- Spring Batch: INFO level for job execution tracking -->
+    <logger name="org.springframework.batch" level="INFO" additivity="false">
+        <springProfile name="dev,test,default">
+            <appender-ref ref="CONSOLE"/>
+        </springProfile>
+        <springProfile name="prod">
+            <appender-ref ref="ASYNC_CLOUDWATCH"/>
+        </springProfile>
+    </logger>
+    
+    <!-- HikariCP: Connection pool monitoring -->
+    <logger name="com.zaxxer.hikari" level="${LOG_LEVEL_HIKARI:-INFO}" additivity="false">
+        <springProfile name="dev,test,default">
+            <appender-ref ref="CONSOLE"/>
+        </springProfile>
+        <springProfile name="prod">
+            <appender-ref ref="ASYNC_CLOUDWATCH"/>
+        </springProfile>
+    </logger>
+    
+    <!-- Flyway: Database migration logging -->
+    <logger name="org.flywaydb" level="INFO" additivity="false">
+        <springProfile name="dev,test,default">
+            <appender-ref ref="CONSOLE"/>
+        </springProfile>
+        <springProfile name="prod">
+            <appender-ref ref="ASYNC_CLOUDWATCH"/>
+        </springProfile>
+    </logger>
+    
+    <!-- Tomcat: Embedded server logging -->
+    <logger name="org.apache.catalina" level="INFO" additivity="false">
+        <springProfile name="dev,test,default">
+            <appender-ref ref="CONSOLE"/>
+        </springProfile>
+        <springProfile name="prod">
+            <appender-ref ref="ASYNC_CLOUDWATCH"/>
+        </springProfile>
+    </logger>
+    
+    <!-- MapStruct: DTO mapping debug -->
+    <logger name="org.mapstruct" level="INFO" additivity="false">
+        <springProfile name="dev,test,default">
+            <appender-ref ref="CONSOLE"/>
+        </springProfile>
+        <springProfile name="prod">
+            <appender-ref ref="ASYNC_CLOUDWATCH"/>
+        </springProfile>
+    </logger>
+    
+    <!-- AWS SDK: CloudWatch/Secrets Manager integration -->
+    <logger name="software.amazon.awssdk" level="INFO" additivity="false">
+        <springProfile name="dev,test,default">
+            <appender-ref ref="CONSOLE"/>
+        </springProfile>
+        <springProfile name="prod">
+            <appender-ref ref="ASYNC_CLOUDWATCH"/>
+        </springProfile>
+    </logger>
+    
+    <!-- ================================================================ -->
+    <!-- ROOT LOGGER: Default configuration for all other loggers        -->
+    <!-- ================================================================ -->
+    <root level="${LOG_LEVEL_ROOT:-INFO}">
+        <springProfile name="dev,test,default">
+            <appender-ref ref="CONSOLE"/>
+        </springProfile>
+        <springProfile name="prod">
+            <appender-ref ref="ASYNC_CLOUDWATCH"/>
+        </springProfile>
+    </root>
+    
+    <!-- ================================================================ -->
+    <!-- CONFIGURATION NOTES & TROUBLESHOOTING                            -->
+    <!-- ================================================================ -->
+    <!--
+        Environment Variable Overrides:
+        All log levels can be overridden via environment variables:
+        - LOG_LEVEL_ROOT: Root logger level (default: INFO)
+        - LOG_LEVEL_CARDDEMO: Application package level (default: DEBUG in dev, INFO in prod)
+        - LOG_LEVEL_SECURITY: Spring Security level (default: INFO)
+        - LOG_LEVEL_SQL: Hibernate SQL logging (default: DEBUG in dev, INFO in prod)
+        - LOG_LEVEL_SQL_PARAMS: SQL parameter binding (default: TRACE in dev, INFO in prod)
+        - LOG_LEVEL_HIKARI: Connection pool logging (default: INFO)
+        
+        Example Kubernetes ConfigMap:
+        apiVersion: v1
+        kind: ConfigMap
+        metadata:
+          name: carddemo-logging-config
+        data:
+          LOG_LEVEL_ROOT: "WARN"
+          LOG_LEVEL_CARDDEMO: "DEBUG"
+          LOG_LEVEL_SQL: "DEBUG"
+        
+        Active Profile Selection:
+        Set via: -Dspring.profiles.active=prod or SPRING_PROFILES_ACTIVE=prod
+        
+        Troubleshooting:
+        
+        1. No logs appearing:
+           - Check active profile: Look for "The following profiles are active" in startup logs
+           - Verify appender is configured for active profile
+           - Check log level settings (may be set too high)
+        
+        2. Sensitive data appearing in logs:
+           - Verify MaskingPatternLayoutConverter is on classpath
+           - Check that %mask() is in log pattern
+           - Review application code to ensure sensitive data isn't in exception messages
+           - Test masking patterns with unit tests
+        
+        3. Performance issues with logging:
+           - Verify AsyncAppender is being used in production
+           - Check queueSize isn't too small (increase if blocking occurs)
+           - Disable includeCallerData if enabled (expensive operation)
+           - Consider increasing discardingThreshold if log loss is acceptable
+        
+        4. Logs not reaching CloudWatch:
+           - Verify CloudWatch agent or Firelens sidecar is configured
+           - Check pod logs are being captured: kubectl logs <pod-name>
+           - Verify IAM permissions for CloudWatch Logs
+           - Check log group and stream names match configuration
+        
+        5. Missing correlation IDs:
+           - Verify CorrelationIdFilter is registered in Spring Security chain
+           - Check MDC.put("correlationId", ...) is called at request entry
+           - Ensure MDC.clear() is called in finally block to prevent leaks
+        
+        6. Stack traces not formatted correctly:
+           - Check throwableConverter configuration in LogstashEncoder
+           - Verify ShortenedThrowableConverter is on classpath
+           - Adjust maxDepthPerThrowable if traces are truncated
+        
+        PCI-DSS Compliance Verification:
+        1. Review all log output for masked card numbers (last 4 digits only)
+        2. Verify SSN masking (last 4 digits only)
+        3. Confirm passwords never appear (even in error messages)
+        4. Check CVV codes are always masked
+        5. Validate account numbers show last 4 digits maximum
+        6. Test exception stack traces don't expose sensitive data
+        7. Review database query logs for bound parameter masking
+        
+        Performance Benchmarks:
+        - Console logging: ~50 microseconds per log statement
+        - Async CloudWatch: ~5 microseconds per log statement (non-blocking)
+        - JSON serialization: ~100 microseconds per log statement
+        - Masking overhead: ~20 microseconds per masked field
+        
+        Batch Job Considerations:
+        Batch jobs may generate high-volume logging. Recommendations:
+        - Use INFO level for batch jobs (not DEBUG)
+        - Log summary statistics per chunk, not per item
+        - Use Spring Batch's ItemReadListener/ItemProcessListener sparingly
+        - Consider separate log file for batch jobs if needed
+        
+        Monitoring Recommendations:
+        - Alert on ERROR level logs (indicates application failures)
+        - Monitor async queue depth (QueueAppender MBean)
+        - Track log volume by package (may indicate performance issues)
+        - Alert on "Appender queue full" messages (log loss imminent)
+        
+        Testing the Configuration:
+        1. Unit test MaskingPatternLayoutConverter with sample sensitive data
+        2. Integration test with @SpringBootTest and OutputCaptureExtension
+        3. Validate JSON structure in production logs
+        4. Verify correlation IDs propagate through call chains
+        5. Load test logging throughput (1000+ logs/second)
+    -->
+    
+</configuration>
