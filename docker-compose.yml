@@ -1,0 +1,189 @@
+# Docker Compose configuration for CardDemo local development environment
+# Provides PostgreSQL database and Spring Boot application services
+# Usage: docker-compose up -d
+
+version: '3.8'
+
+services:
+  # PostgreSQL 15 database service
+  postgres:
+    image: postgres:15-alpine
+    container_name: carddemo-postgres
+    restart: unless-stopped
+    
+    # Environment variables for database initialization
+    environment:
+      # Database credentials
+      POSTGRES_DB: carddemo
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      
+      # PostgreSQL configuration
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
+      
+      # Connection limits and memory settings
+      POSTGRES_MAX_CONNECTIONS: 100
+      POSTGRES_SHARED_BUFFERS: 256MB
+    
+    # Port mapping: host:container
+    ports:
+      - "5432:5432"
+    
+    # Persistent volume for database data
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./src/main/resources/db/migration:/docker-entrypoint-initdb.d:ro
+    
+    # Health check configuration
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d carddemo"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '1'
+          memory: 512M
+    
+    # Network configuration
+    networks:
+      - carddemo-network
+
+  # CardDemo Spring Boot application service
+  carddemo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - MAVEN_OPTS=-Dmaven.repo.local=/root/.m2/repository
+    
+    container_name: carddemo-app
+    restart: unless-stopped
+    
+    # Service dependencies
+    depends_on:
+      postgres:
+        condition: service_healthy
+    
+    # Environment variables for application configuration
+    environment:
+      # Spring profile
+      SPRING_PROFILES_ACTIVE: dev
+      
+      # Database connection
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: carddemo
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      
+      # Connection pool configuration
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 10
+      SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: 5
+      SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT: 30000
+      SPRING_DATASOURCE_HIKARI_IDLE_TIMEOUT: 600000
+      SPRING_DATASOURCE_HIKARI_MAX_LIFETIME: 1800000
+      
+      # JPA/Hibernate configuration
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      SPRING_JPA_SHOW_SQL: false
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
+      SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL: true
+      SPRING_JPA_PROPERTIES_HIBERNATE_JDBC_BATCH_SIZE: 50
+      SPRING_JPA_PROPERTIES_HIBERNATE_ORDER_INSERTS: true
+      SPRING_JPA_PROPERTIES_HIBERNATE_ORDER_UPDATES: true
+      
+      # Flyway migration
+      SPRING_FLYWAY_ENABLED: true
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: true
+      SPRING_FLYWAY_VALIDATE_ON_MIGRATE: true
+      
+      # JWT security configuration
+      JWT_SECRET: dev-secret-key-change-in-production-min-256-bits
+      JWT_EXPIRATION: 3600000
+      
+      # Logging configuration
+      LOGGING_LEVEL_ROOT: INFO
+      LOGGING_LEVEL_COM_AWS_CARDDEMO: DEBUG
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK: INFO
+      LOGGING_LEVEL_ORG_HIBERNATE: WARN
+      
+      # Actuator endpoints
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,metrics,prometheus
+      MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS: always
+      
+      # Server configuration
+      SERVER_PORT: 8080
+      SERVER_SERVLET_CONTEXT_PATH: /
+      
+      # JVM configuration
+      JAVA_OPTS: >-
+        -Xms512m
+        -Xmx1g
+        -XX:+UseG1GC
+        -XX:MaxGCPauseMillis=200
+        -XX:+HeapDumpOnOutOfMemoryError
+        -XX:HeapDumpPath=/tmp/heapdump.hprof
+        -Djava.security.egd=file:/dev/./urandom
+    
+    # Port mapping: host:container
+    ports:
+      - "8080:8080"
+    
+    # Volume mounts for development
+    volumes:
+      # Application logs
+      - ./logs:/app/logs
+      
+      # Heap dumps for debugging
+      - ./tmp:/tmp
+    
+    # Health check configuration
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+    
+    # Network configuration
+    networks:
+      - carddemo-network
+    
+    # Standard streams configuration
+    stdin_open: true
+    tty: true
+
+# Named volumes for data persistence
+volumes:
+  postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/postgres
+
+# Custom network for service communication
+networks:
+  carddemo-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
