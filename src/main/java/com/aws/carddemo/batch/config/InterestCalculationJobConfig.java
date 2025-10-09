@@ -480,7 +480,7 @@ public class InterestCalculationJobConfig {
      * @return configured Step bean with chunk size 100 and complete reader-processor-writer chain
      * 
      * @see StepBuilder Spring Batch fluent API for step configuration
-     * @see AccountReader#accountReader(EntityManagerFactory) Reader bean factory method
+     * @see AccountReader#accountJpaReader(EntityManagerFactory) Reader bean factory method
      * @see InterestProcessor#process(Account) Processor business logic
      * @see AccountWriter#write(org.springframework.batch.item.Chunk) Writer batch persistence
      * @see PlatformTransactionManager Spring transaction management
@@ -492,13 +492,13 @@ public class InterestCalculationJobConfig {
             AccountReader accountReader,
             InterestProcessor interestProcessor,
             AccountWriter accountWriter,
-            EntityManagerFactory entityManagerFactory) {
+            EntityManagerFactory entityManagerFactory) throws Exception {
         
         log.info("Configuring interestCalculationStep with chunk size 100");
         
         return new StepBuilder("interestCalculationStep", jobRepository)
                 .<Account, InterestTransaction>chunk(100, transactionManager)
-                .reader(accountReader.accountReader(entityManagerFactory))
+                .reader(accountReader.accountJpaReader(entityManagerFactory))
                 .processor(interestProcessor)
                 .writer(accountWriter)
                 .build();
