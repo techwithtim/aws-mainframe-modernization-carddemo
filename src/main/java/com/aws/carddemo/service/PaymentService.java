@@ -1,6 +1,7 @@
 package com.aws.carddemo.service;
 
 import com.aws.carddemo.dto.request.PaymentRequest;
+import com.aws.carddemo.dto.response.PaymentResponse;
 import com.aws.carddemo.exception.InsufficientFundsException;
 import com.aws.carddemo.exception.InvalidInputException;
 import com.aws.carddemo.exception.ResourceNotFoundException;
@@ -936,21 +937,5 @@ public class PaymentService {
     }
 }
 
-/**
- * Payment response DTO containing payment confirmation details.
- * Replaces COBOL BMS screen output fields from COBIL0A map.
- */
-@lombok.Data
-@lombok.Builder
-class PaymentResponse {
-    private String confirmationNumber;
-    private Long accountId;
-    private String accountNumber;
-    private BigDecimal paymentAmount;
-    private BigDecimal previousBalance;
-    private BigDecimal newBalance;
-    private LocalDate paymentDate;
-    private Long transactionId;
-    private String message;
-}
+
 
