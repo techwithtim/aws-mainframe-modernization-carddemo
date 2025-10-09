@@ -22,6 +22,7 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -364,7 +365,7 @@ public class StatementWriter implements ItemWriter<StatementWriter.StatementData
      */
     private BigDecimal calculateMinimumPayment(BigDecimal currentBalance) {
         BigDecimal twoPercent = currentBalance.multiply(new BigDecimal("0.02"))
-                .setScale(2, BigDecimal.ROUND_HALF_UP);
+                .setScale(2, RoundingMode.HALF_UP);
         BigDecimal minimum = new BigDecimal("25.00");
         return twoPercent.max(minimum);
     }
