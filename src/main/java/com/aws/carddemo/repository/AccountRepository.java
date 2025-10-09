@@ -28,7 +28,7 @@ import java.util.Optional;
  * READ ACCTFILE KEY IS ACCT-ID            findByAccountNumber(accountNumber)
  * READ ACCTFILE KEY IS ACCT-ID            findByIdWithLock(id) [with SELECT FOR UPDATE]
  *   WITH LOCK FOR UPDATE
- * STARTBR/READNEXT by CUST-ID            findByCustomerId(customerId)
+ * STARTBR/READNEXT by CUST-ID            findByCustomer_CustomerIdOrderByAccountNumber(customerId)
  * STARTBR/READNEXT by GROUP-ID           findByGroupId(groupId)
  * WRITE ACCTFILE                          save(account) [insert]
  * REWRITE ACCTFILE                        save(account) [update on existing entity]
@@ -85,7 +85,7 @@ import java.util.Optional;
  * Optional<Account> account = accountRepository.findByAccountNumber("00012345678");
  * 
  * // Customer's accounts (replaces customer-to-account navigation)
- * List<Account> accounts = accountRepository.findByCustomerId(123L);
+ * List<Account> accounts = accountRepository.findByCustomer_CustomerIdOrderByAccountNumber(123L);
  * 
  * // Concurrent-safe balance update (replaces CBTRN01C.cbl REWRITE with lock)
  * Account account = accountRepository.findByIdWithLock(accountId)
@@ -129,16 +129,21 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
     Optional<Account> findByAccountNumber(String accountNumber);
     
     /**
-     * Find all accounts belonging to a specific customer.
+     * Find all accounts belonging to a specific customer, ordered by account number.
      * 
      * <p><b>Replaces COBOL:</b> Sequential browse of ACCTFILE filtered by customer</p>
      * <p>From: app/cbl/COACTVWC.cbl customer-to-accounts navigation pattern</p>
      * 
      * <p><b>Query Generated:</b></p>
-     * <pre>SELECT * FROM ACCOUNT WHERE customer_id = ? ORDER BY account_number</pre>
+     * <pre>SELECT * FROM ACCOUNT WHERE customer_id = ? ORDER BY account_number ASC</pre>
      * 
      * <p>Uses index idx_account_customer for efficient filtering. Results ordered by
      * account_number to provide consistent ordering for UI display.</p>
+     * 
+     * <p><b>Spring Data Query Derivation:</b></p>
+     * <p>Method name uses underscore notation to traverse nested property path:
+     * Customer_CustomerId → Account.customer (ManyToOne) → Customer.customerId (ID field)
+     * OrderByAccountNumber → Adds ORDER BY account_number ASC clause</p>
      * 
      * <p><b>Use Cases:</b></p>
      * <ul>
@@ -148,10 +153,10 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
      * </ul>
      * 
      * @param customerId Customer ID foreign key (Account.customer.customerId)
-     * @return List of accounts owned by the customer, empty list if none found
+     * @return List of accounts owned by the customer ordered by account number, empty list if none found
      * @throws IllegalArgumentException if customerId is null
      */
-    List<Account> findByCustomerId(Long customerId);
+    List<Account> findByCustomer_CustomerIdOrderByAccountNumber(Long customerId);
     
     /**
      * Find all accounts in a specific disclosure group for interest rate calculation.
