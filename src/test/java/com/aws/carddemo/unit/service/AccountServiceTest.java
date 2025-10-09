@@ -137,7 +137,7 @@ class AccountServiceTest {
                 .accountNumber(TEST_ACCOUNT_NUMBER)
                 .currentBalance(TEST_BALANCE)
                 .creditLimit(TEST_CREDIT_LIMIT)
-                .accountStatus(ACTIVE_STATUS)
+                .activeStatus(ACTIVE_STATUS)
                 .openDate(LocalDate.now())
                 .customer(testCustomer)
                 .build();
@@ -161,7 +161,7 @@ class AccountServiceTest {
         assertEquals(TEST_ACCOUNT_NUMBER, result.getAccountNumber(), "Account number should match");
         assertEquals(TEST_BALANCE, result.getCurrentBalance(), "Current balance should match");
         assertEquals(TEST_CREDIT_LIMIT, result.getCreditLimit(), "Credit limit should match");
-        assertEquals(ACTIVE_STATUS, result.getAccountStatus(), "Account status should match");
+        assertEquals(ACTIVE_STATUS, result.getActiveStatus(), "Account status should match");
         assertNotNull(result.getCustomer(), "Customer relationship should be loaded");
         assertEquals("John", result.getCustomer().getFirstName(), "Customer first name should match");
         assertEquals("Doe", result.getCustomer().getLastName(), "Customer last name should match");
@@ -484,24 +484,36 @@ class AccountServiceTest {
     }
 
     @Test
-    @DisplayName("updateAccount - Balance Changed: Validates credit limit")
-    void testUpdateAccount_BalanceChangedValidatesLimit() {
-        // Given: Update request changes balance
-        AccountUpdateRequest updateRequest = new AccountUpdateRequest();
-        updateRequest.setCurrentBalance(new BigDecimal("4500.00")); // Within $5,000 limit
+    @DisplayName("updateAccount - Credit Limit Changed: Validates credit limit does not exceed balance")
+    void testUpdateAccount_CreditLimitChangedValidatesLimit() {
+        // Given: Update request changes credit limit
+        AccountUpdateRequest updateRequest = AccountUpdateRequest.builder()
+                .accountStatus("A")
+                .creditLimit(new BigDecimal("4500.00")) // Reducing from $5,000 to $4,500
+                .cashCreditLimit(new BigDecimal("1000.00"))
+                .accountOpenDate(LocalDate.now().minusYears(1))
+                .accountExpirationDate(LocalDate.now().plusYears(2))
+                .firstName("John")
+                .lastName("Doe")
+                .dateOfBirth(LocalDate.of(1990, 1, 1))
+                .addressLine1("123 Main St")
+                .city("Dallas")
+                .state("TX")
+                .zipCode("75001")
+                .build();
 
         when(accountRepository.findByIdWithLock(TEST_ACCOUNT_ID))
                 .thenReturn(Optional.of(testAccount));
         doAnswer(invocation -> {
             AccountUpdateRequest request = invocation.getArgument(0);
             Account account = invocation.getArgument(1);
-            account.setCurrentBalance(request.getCurrentBalance());
+            account.setCreditLimit(request.getCreditLimit());
             return null;
         }).when(accountMapper).updateEntityFromRequest(updateRequest, testAccount);
         when(accountRepository.save(any(Account.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        // When: Account is updated with new balance
+        // When: Account is updated with new credit limit
         Account result = accountService.updateAccount(TEST_ACCOUNT_ID, updateRequest);
 
         // Then: Update succeeds and credit limit validation passes
