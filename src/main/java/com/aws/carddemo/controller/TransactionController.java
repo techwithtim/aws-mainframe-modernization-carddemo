@@ -3,10 +3,13 @@ package com.aws.carddemo.controller;
 import com.aws.carddemo.dto.request.TransactionRequest;
 import com.aws.carddemo.dto.response.TransactionListResponse;
 import com.aws.carddemo.dto.response.TransactionResponse;
+import com.aws.carddemo.mapper.TransactionMapper;
+import com.aws.carddemo.model.Transaction;
 import com.aws.carddemo.service.TransactionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -267,6 +270,18 @@ public class TransactionController {
     private final TransactionService transactionService;
 
     /**
+     * Transaction mapper for entity-to-DTO conversions.
+     * Injected via constructor (Lombok @RequiredArgsConstructor).
+     * 
+     * <p>Converts between:
+     * <ul>
+     *   <li>Transaction entity → TransactionResponse DTO</li>
+     *   <li>TransactionRequest DTO → Transaction entity</li>
+     * </ul>
+     */
+    private final TransactionMapper transactionMapper;
+
+    /**
      * Retrieves paginated transaction history for a specific account.
      * 
      * <p><b>Endpoint:</b> GET /api/v1/accounts/{accountId}/transactions
@@ -467,18 +482,23 @@ public class TransactionController {
                 maskedAccountId, pageable.getPageNumber(), pageable.getPageSize(), startDate, endDate, typeCode);
         
         // Delegate to service layer for business logic and data retrieval
-        TransactionListResponse response;
+        Page<Transaction> transactionPage;
         
         if (startDate != null || endDate != null) {
             // Date range filter requested - use specialized service method
             // Replaces COBOL date range filtering logic from COTRN00C.cbl
             log.debug("Applying date range filter: start={}, end={}", startDate, endDate);
-            response = transactionService.getTransactionsByDateRange(accountId, startDate, endDate, pageable);
+            transactionPage = transactionService.getTransactionsByDateRange(accountId, startDate, endDate, pageable);
         } else {
             // Standard transaction history retrieval without date filtering
             // Replaces COBOL STARTBR/READNEXT browse from COTRN00C.cbl
-            response = transactionService.getTransactionHistory(accountId, pageable);
+            transactionPage = transactionService.getTransactionHistory(accountId, pageable);
         }
+        
+        // Convert Page<Transaction> to TransactionListResponse DTO
+        // Build base URL for HATEOAS links
+        String baseUrl = "/api/v1/accounts/" + accountId + "/transactions";
+        TransactionListResponse response = TransactionListResponse.fromPage(transactionPage, baseUrl);
         
         log.info("Successfully retrieved {} transactions for account: {}, totalElements: {}, totalPages: {}",
                 response.getTransactions().size(), maskedAccountId, response.getTotalElements(), response.getTotalPages());
@@ -626,7 +646,10 @@ public class TransactionController {
         
         // Delegate to service layer for direct transaction retrieval by ID
         // Replaces COBOL EXEC CICS READ FILE('TRANFILE') from COTRN01C.cbl
-        TransactionResponse response = transactionService.getTransactionById(transactionId);
+        Transaction transaction = transactionService.getTransactionById(transactionId);
+        
+        // Convert Transaction entity to TransactionResponse DTO
+        TransactionResponse response = transactionMapper.toResponse(transaction);
         
         log.info("Successfully retrieved transaction: {}, amount: {}, type: {}",
                 response.getTransactionNumber(), response.getAmount(), response.getTransactionTypeCode());
@@ -944,7 +967,20 @@ public class TransactionController {
         // - Account balance update (paragraph 3100-UPDATE-ACCOUNT-BALANCE)
         // - Category balance update (paragraph 3200-UPDATE-CATEGORY-BALANCE)
         // All wrapped in @Transactional (CICS SYNCPOINT equivalent)
-        TransactionResponse response = transactionService.postTransaction(request);
+        
+        // Extract parameters from request DTO for service method call
+        // TransactionService.postTransaction expects 6 individual parameters
+        Transaction transaction = transactionService.postTransaction(
+                request.getCardNumber(),
+                request.getTransactionAmount(),
+                request.getMerchantName(),
+                request.getTransactionTypeCode(),
+                request.getTransactionCategoryCode(),
+                request.getTransactionDate()
+        );
+        
+        // Convert Transaction entity to TransactionResponse DTO
+        TransactionResponse response = transactionMapper.toResponse(transaction);
         
         log.info("Successfully created transaction: {}, amount: {}, accountId: {}",
                 response.getTransactionNumber(), response.getAmount(), response.getAccountId());
