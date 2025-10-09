@@ -234,15 +234,26 @@ public class Account extends BaseEntity implements Serializable {
     /**
      * Collection of cards associated with this account.
      * Bidirectional relationship - mapped by "account" in Card entity.
-     * Cascade ALL operations to maintain referential integrity.
-     * OrphanRemoval ensures deleted cards are removed from database.
+     * 
+     * <p><b>NO CASCADE DELETE:</b> Business rule requires accounts with active cards
+     * cannot be deleted (ON DELETE RESTRICT constraint at database level). Application
+     * must explicitly deactivate or remove all cards before account closure. This prevents
+     * accidental data loss and enforces proper account lifecycle management per COBOL
+     * business rules.
+     * 
+     * <p><b>NO ORPHAN REMOVAL:</b> Disabled to prevent automatic deletion of cards when
+     * parent account is deleted. Cards must be explicitly deleted through Card repository
+     * or service layer, maintaining audit trail and business process compliance.
+     * 
+     * <p><b>Cascade Operations:</b> PERSIST, MERGE, REFRESH only - these support
+     * convenience operations (saving account with new cards, refreshing relationships)
+     * without compromising referential integrity enforcement.
      * 
      * COBOL Mapping: One-to-many relationship through CARDXREF file
      */
     @OneToMany(
         mappedBy = "account",
-        cascade = CascadeType.ALL,
-        orphanRemoval = true,
+        cascade = {CascadeType.PERSIST, CascadeType.MERGE, CascadeType.REFRESH},
         fetch = FetchType.LAZY
     )
     @Builder.Default

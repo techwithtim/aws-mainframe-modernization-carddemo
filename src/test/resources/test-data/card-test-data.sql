@@ -485,6 +485,12 @@ INSERT INTO card_xref (card_number, customer_id, account_id, created_at, updated
 VALUES ('9805583408996588', '000000040', '00000000040', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- ===================================================================================
+-- NOTE: Card IDs 1-50 are reserved by the test data above
+-- Ad-hoc tests should NOT use these IDs to avoid primary key collisions
+-- Use IDs 51+ for ad-hoc test cases
+-- ===================================================================================
+
+-- ===================================================================================
 -- End of Card Test Data
 -- ===================================================================================
 -- Total Records:
@@ -506,3 +512,7 @@ VALUES ('9805583408996588', '000000040', '00000000040', CURRENT_TIMESTAMP, CURRE
 --     * COCRDSLC.cbl (Card Detail View)
 --     * COCRDUPC.cbl (Card Update)
 -- ===================================================================================
+
+-- Reset sequence to avoid primary key collisions in ad-hoc tests
+-- H2 syntax for restarting IDENTITY sequence after bulk data loading (IDs 1-50)
+ALTER TABLE card ALTER COLUMN card_id RESTART WITH 51;

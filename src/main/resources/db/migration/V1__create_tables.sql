@@ -217,9 +217,10 @@ CREATE TABLE card (
     CONSTRAINT chk_card_number_format CHECK (card_number ~ '^\d{16}$'),
     CONSTRAINT chk_card_expiration CHECK (expiration_date > CURRENT_DATE),
     
-    -- Foreign Key Constraint
+    -- Foreign Key Constraint (RESTRICT prevents account deletion when cards exist)
+    -- Replaces COBOL business rule: Cannot delete account with active cards
     CONSTRAINT fk_card_account FOREIGN KEY (account_id) 
-        REFERENCES account(account_id) ON DELETE CASCADE,
+        REFERENCES account(account_id) ON DELETE RESTRICT,
     
     -- Audit Columns
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
