@@ -277,7 +277,7 @@ public class ReportService {
                     .endDate(endDate)
                     .accountId(accountId)
                     .reportStatus(jobExecution.getStatus().name())
-                    .createdAt(LocalDateTime.ofInstant(jobExecution.getCreateTime().toInstant(), ZoneId.systemDefault()))
+                    .createdAt(jobExecution.getCreateTime())  // getCreateTime() returns LocalDateTime directly in Spring Batch 5.x
                     .estimatedCompletion(calculateEstimatedCompletion(startDate, endDate))
                     .downloadUrl(null)  // Will be populated when job completes
                     .message("Report generation job submitted successfully")
@@ -392,7 +392,7 @@ public class ReportService {
                 .endDate(endDate)
                 .accountId(accountId)
                 .reportStatus(status.name())
-                .createdAt(LocalDateTime.ofInstant(jobExecution.getCreateTime().toInstant(), ZoneId.systemDefault()))
+                .createdAt(jobExecution.getCreateTime())  // getCreateTime() returns LocalDateTime directly in Spring Batch 5.x
                 .estimatedCompletion(estimatedCompletion)
                 .downloadUrl(downloadUrl)
                 .message(message)
