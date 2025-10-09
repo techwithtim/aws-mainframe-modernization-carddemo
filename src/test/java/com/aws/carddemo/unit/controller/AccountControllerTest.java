@@ -3,6 +3,7 @@ package com.aws.carddemo.unit.controller;
 import com.aws.carddemo.controller.AccountController;
 import com.aws.carddemo.dto.request.AccountUpdateRequest;
 import com.aws.carddemo.dto.response.AccountResponse;
+import com.aws.carddemo.mapper.AccountMapper;
 import com.aws.carddemo.model.Account;
 import com.aws.carddemo.service.AccountService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -10,15 +11,18 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.batch.BatchAutoConfiguration;
-import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
-import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
+
+import com.aws.carddemo.CardDemoApplication;
+import com.aws.carddemo.config.SecurityConfig;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -26,6 +30,8 @@ import java.time.LocalDate;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -182,26 +188,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @see AccountUpdateRequest for request DTO structure and validation rules
  * @see com.aws.carddemo.exception.ResourceNotFoundException for 404 error handling
  */
-@WebMvcTest(
-    controllers = AccountController.class,
-    excludeAutoConfiguration = {
-        DataSourceAutoConfiguration.class,
-        HibernateJpaAutoConfiguration.class,
-        BatchAutoConfiguration.class
-    },
-    excludeFilters = @ComponentScan.Filter(
-        type = FilterType.ASSIGNABLE_TYPE,
-        classes = {
-            com.aws.carddemo.config.BatchConfig.class,
-            com.aws.carddemo.config.DataSourceConfig.class,
-            com.aws.carddemo.config.JpaAuditingConfig.class,
-            com.aws.carddemo.batch.config.InterestCalculationJobConfig.class,
-            com.aws.carddemo.batch.config.TransactionPostingJobConfig.class,
-            com.aws.carddemo.batch.config.StatementGenerationJobConfig.class,
-            com.aws.carddemo.batch.config.TransactionReportJobConfig.class
-        }
-    )
-)
+@WebMvcTest(controllers = AccountController.class)
+@ContextConfiguration(classes = {
+    AccountController.class, 
+    SecurityConfig.class,
+    com.aws.carddemo.exception.GlobalExceptionHandler.class
+})
 @DisplayName("AccountController Unit Tests - COBOL Migration Equivalence")
 public class AccountControllerTest {
 
@@ -210,6 +202,19 @@ public class AccountControllerTest {
 
     @MockBean
     private AccountService accountService;
+    
+    @MockBean
+    private AccountMapper accountMapper;
+    
+    // Mock UserDetailsService to satisfy SecurityConfig constructor injection
+    // SecurityConfig requires UserDetailsService (interface) as a dependency
+    @MockBean
+    private org.springframework.security.core.userdetails.UserDetailsService userDetailsService;
+    
+    // Mock JwtTokenProvider to satisfy SecurityConfig jwtAuthenticationFilter method
+    // JwtTokenProvider is required by jwtAuthenticationFilter(@Bean method parameter)
+    @MockBean
+    private com.aws.carddemo.security.JwtTokenProvider jwtTokenProvider;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -254,9 +259,25 @@ public class AccountControllerTest {
         testAccount.setAddressZip("75001");
         testAccount.setGroupId("DEFAULT");
 
+        // Mock AccountMapper to convert Account entity to AccountResponse DTO
+        AccountResponse mockResponse = AccountResponse.builder()
+                .accountId(1L)
+                .accountNumber("00012345678")
+                .activeStatus("Y")
+                .creditLimit(BigDecimal.valueOf(5000.00))
+                .cashCreditLimit(BigDecimal.valueOf(1000.00))
+                .currentBalance(BigDecimal.valueOf(2500.50))
+                .openDate(LocalDate.of(2020, 1, 1))
+                .expirationDate(LocalDate.of(2025, 12, 31))
+                .addressZip("75001")
+                .groupId("DEFAULT")
+                .build();
+        
+        when(accountMapper.toResponse(any(Account.class))).thenReturn(mockResponse);
+
         // Initialize AccountUpdateRequest test fixture
         testUpdateRequest = AccountUpdateRequest.builder()
-                .accountStatus("Y")
+                .accountStatus("A")  // "A" = Active (valid pattern: [ACS])
                 .statusReason("Active Account")
                 .creditLimit(BigDecimal.valueOf(6000.00))
                 .cashCreditLimit(BigDecimal.valueOf(1200.00))
@@ -329,6 +350,7 @@ public class AccountControllerTest {
 
         // When: GET request to /api/v1/accounts/1
         mockMvc.perform(get("/api/v1/accounts/{id}", 1L)
+                        .with(user("testuser").roles("USER"))
                         .accept(MediaType.APPLICATION_JSON))
                 // Then: Verify response status and structure
                 .andExpect(status().isOk())
@@ -336,9 +358,9 @@ public class AccountControllerTest {
                 .andExpect(jsonPath("$.accountId").value(1))
                 .andExpect(jsonPath("$.accountNumber").value("00012345678"))
                 .andExpect(jsonPath("$.activeStatus").value("Y"))
-                .andExpect(jsonPath("$.creditLimit").value("5000.00"))
-                .andExpect(jsonPath("$.cashCreditLimit").value("1000.00"))
-                .andExpect(jsonPath("$.currentBalance").value("2500.50"))
+                .andExpect(jsonPath("$.creditLimit").value(5000.0))
+                .andExpect(jsonPath("$.cashCreditLimit").value(1000.0))
+                .andExpect(jsonPath("$.currentBalance").value(2500.5))
                 .andExpect(jsonPath("$.openDate").value("2020-01-01"))
                 .andExpect(jsonPath("$.expirationDate").value("2025-12-31"))
                 .andExpect(jsonPath("$.addressZip").value("75001"))
@@ -385,6 +407,7 @@ public class AccountControllerTest {
 
         // When: GET request to non-existent account
         mockMvc.perform(get("/api/v1/accounts/{id}", 999L)
+                        .with(user("testuser").roles("USER"))
                         .accept(MediaType.APPLICATION_JSON))
                 // Then: Verify 404 NOT FOUND response
                 .andExpect(status().isNotFound());
@@ -461,9 +484,27 @@ public class AccountControllerTest {
 
         when(accountService.updateAccount(anyLong(), any(AccountUpdateRequest.class)))
                 .thenReturn(updatedAccount);
+        
+        // Mock AccountMapper to return updated response
+        AccountResponse updatedResponse = AccountResponse.builder()
+                .accountId(1L)
+                .accountNumber("00012345678")
+                .activeStatus("Y")
+                .creditLimit(BigDecimal.valueOf(6000.00))  // Updated
+                .cashCreditLimit(BigDecimal.valueOf(1200.00))  // Updated
+                .currentBalance(BigDecimal.valueOf(2500.50))
+                .openDate(LocalDate.of(2020, 1, 1))
+                .expirationDate(LocalDate.of(2026, 12, 31))  // Updated
+                .reissueDate(LocalDate.of(2023, 6, 1))  // Updated
+                .addressZip("75001")
+                .groupId("DEFAULT")
+                .build();
+        when(accountMapper.toResponse(updatedAccount)).thenReturn(updatedResponse);
 
         // When: PUT request with AccountUpdateRequest JSON
         mockMvc.perform(put("/api/v1/accounts/{id}", 1L)
+                        .with(user("testuser").roles("USER"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(testUpdateRequest)))
@@ -471,8 +512,8 @@ public class AccountControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.accountId").value(1))
-                .andExpect(jsonPath("$.creditLimit").value("6000.00"))
-                .andExpect(jsonPath("$.cashCreditLimit").value("1200.00"))
+                .andExpect(jsonPath("$.creditLimit").value(6000.0))
+                .andExpect(jsonPath("$.cashCreditLimit").value(1200.0))
                 .andExpect(jsonPath("$.expirationDate").value("2026-12-31"))
                 .andExpect(jsonPath("$.reissueDate").value("2023-06-01"));
 
@@ -541,6 +582,8 @@ public class AccountControllerTest {
 
         // When: PUT request with invalid data
         mockMvc.perform(put("/api/v1/accounts/{id}", 1L)
+                        .with(user("testuser").roles("USER"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(invalidRequest)))
@@ -593,6 +636,8 @@ public class AccountControllerTest {
 
         // When: PUT request to update non-existent account
         mockMvc.perform(put("/api/v1/accounts/{id}", 999L)
+                        .with(user("testuser").roles("USER"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(testUpdateRequest)))
@@ -628,6 +673,8 @@ public class AccountControllerTest {
 
         // When: PUT request with malformed JSON
         mockMvc.perform(put("/api/v1/accounts/{id}", 1L)
+                        .with(user("testuser").roles("USER"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON)
                         .content(malformedJson))
@@ -680,6 +727,8 @@ public class AccountControllerTest {
 
         // When: PUT request with invalid credit/cash limit relationship
         mockMvc.perform(put("/api/v1/accounts/{id}", 1L)
+                        .with(user("testuser").roles("USER"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(invalidRequest)))
@@ -728,6 +777,8 @@ public class AccountControllerTest {
 
         // When: PUT request with invalid date relationship
         mockMvc.perform(put("/api/v1/accounts/{id}", 1L)
+                        .with(user("testuser").roles("USER"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(invalidRequest)))

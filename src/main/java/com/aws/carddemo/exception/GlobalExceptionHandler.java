@@ -517,6 +517,40 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handles HttpMessageNotReadableException thrown when request body cannot be parsed.
+     * 
+     * <p>This exception occurs when:</p>
+     * <ul>
+     *   <li>JSON syntax is invalid (missing quotes, brackets, etc.)</li>
+     *   <li>JSON data types don't match DTO fields (string for numeric field, etc.)</li>
+     *   <li>Request body is empty when content is expected</li>
+     * </ul>
+     * 
+     * <p>Replaces COBOL: Input validation logic that checks for valid numeric/alphanumeric data</p>
+     * 
+     * @param ex the HttpMessageNotReadableException thrown by Spring MVC
+     * @param request the HttpServletRequest for extracting request URI
+     * @return ResponseEntity with ApiError body and HTTP 400 status
+     */
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiError> handleHttpMessageNotReadable(
+            org.springframework.http.converter.HttpMessageNotReadableException ex,
+            HttpServletRequest request) {
+        
+        log.warn("Malformed JSON request at URI: {} - {}", request.getRequestURI(), ex.getMessage());
+        
+        ApiError error = ApiError.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error(HttpStatus.BAD_REQUEST.getReasonPhrase())
+                .message("Malformed JSON request body")
+                .path(request.getRequestURI())
+                .build();
+        
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    /**
      * Handles DataIntegrityViolationException thrown by Spring Data JPA for database constraint violations.
      * 
      * <p>This handler detects UNIQUE constraint violations and translates them to
