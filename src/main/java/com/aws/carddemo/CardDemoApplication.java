@@ -127,7 +127,6 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @SpringBootApplication
 @EnableBatchProcessing
 @EnableTransactionManagement
-@EnableJpaAuditing
 @ComponentScan(basePackages = "com.aws.carddemo")
 public class CardDemoApplication {
 

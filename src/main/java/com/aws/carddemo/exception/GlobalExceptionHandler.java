@@ -637,6 +637,37 @@ public class GlobalExceptionHandler {
      * @param request the HttpServletRequest for extracting request URI
      * @return ResponseEntity with ApiError body and HTTP 500 status
      */
+    /**
+     * Handles Spring Security AccessDeniedException when @PreAuthorize checks fail.
+     * 
+     * <p>This handler specifically catches authorization failures from method-level security
+     * annotations (@PreAuthorize, @Secured) and returns 403 Forbidden, replacing generic 500 errors.</p>
+     * 
+     * <p>COBOL Legacy: Equivalent to checking user authorization before EXEC CICS XCTL to restricted programs.</p>
+     * 
+     * @param ex the AccessDeniedException thrown by Spring Security
+     * @param request the HTTP request that triggered the exception
+     * @return ResponseEntity with 403 Forbidden status and standardized ApiError body
+     */
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<ApiError> handleAccessDeniedException(
+            org.springframework.security.access.AccessDeniedException ex,
+            HttpServletRequest request) {
+        
+        log.warn("Access denied at URI: {} - Reason: {}", 
+                request.getRequestURI(), ex.getMessage());
+        
+        ApiError error = ApiError.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.FORBIDDEN.value())
+                .error(HttpStatus.FORBIDDEN.getReasonPhrase())
+                .message("Access denied. You do not have permission to access this resource.")
+                .path(request.getRequestURI())
+                .build();
+        
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+    }
+    
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleGenericException(
             Exception ex, 

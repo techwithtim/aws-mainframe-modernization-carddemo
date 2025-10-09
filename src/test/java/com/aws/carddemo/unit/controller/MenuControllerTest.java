@@ -11,22 +11,44 @@ package com.aws.carddemo.unit.controller;
 
 import com.aws.carddemo.controller.MenuController;
 import com.aws.carddemo.dto.response.MenuResponse;
+import com.aws.carddemo.repository.UserRepository;
+import com.aws.carddemo.security.JwtAuthenticationFilter;
+import com.aws.carddemo.security.UserDetailsServiceImpl;
+import com.aws.carddemo.service.AuthenticationService;
 import com.aws.carddemo.service.MenuService;
+import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.FilterType;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.test.context.support.WithAnonymousUser;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.PlatformTransactionManager;
+
+import javax.sql.DataSource;
 
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
@@ -90,15 +112,73 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @see MenuService
  * @see MenuResponse
  */
-@WebMvcTest(MenuController.class)
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
 @DisplayName("MenuController Unit Tests")
 class MenuControllerTest {
+    
+    /**
+     * Test security configuration that enables method-level security for @PreAuthorize testing.
+     * 
+     * <p>This configuration is necessary because the main SecurityConfig has @Profile("!test"),
+     * which excludes it from test execution. This test configuration ensures @PreAuthorize
+     * annotations are properly enforced during testing.</p>
+     */
+    @TestConfiguration
+    @EnableMethodSecurity(prePostEnabled = true)
+    @EnableWebSecurity
+    static class TestSecurityConfig {
+        
+        @Bean
+        public SecurityFilterChain testSecurityFilterChain(HttpSecurity http) throws Exception {
+            http
+                    .csrf(AbstractHttpConfigurer::disable)
+                    .authorizeHttpRequests(auth -> auth
+                            .anyRequest().authenticated()
+                    )
+                    .exceptionHandling(exception -> exception
+                            .authenticationEntryPoint((request, response, authException) -> {
+                                response.setStatus(401);
+                                response.setContentType("application/json");
+                                response.getWriter().write("{\"message\":\"Unauthorized\"}");
+                            })
+                    )
+                    .sessionManagement(session -> session
+                            .sessionCreationPolicy(org.springframework.security.config.http.SessionCreationPolicy.STATELESS)
+                    );
+            
+            return http.build();
+        }
+    }
     
     @Autowired
     private MockMvc mockMvc;
     
     @MockBean
     private MenuService menuService;
+    
+    @Autowired
+    private org.springframework.context.ApplicationContext applicationContext;
+    
+    /**
+     * Verify that MenuController is loaded in the application context.
+     */
+    @Test
+    @DisplayName("MenuController bean should be loaded in test context")
+    void testMenuControllerBeanExists() {
+        org.junit.jupiter.api.Assertions.assertNotNull(
+                applicationContext.getBean(MenuController.class),
+                "MenuController should be present in the application context"
+        );
+        
+        // Print all registered request mappings for debugging
+        org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping mapping = 
+                applicationContext.getBean(org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping.class);
+        mapping.getHandlerMethods().forEach((key, value) -> {
+            System.out.println("Registered mapping: " + key);
+        });
+    }
     
     /**
      * Test GET /api/v1/menu returns 200 OK with main menu options for regular users.
@@ -217,6 +297,7 @@ class MenuControllerTest {
         // Act & Assert: Execute GET /api/v1/menu and validate response
         mockMvc.perform(get("/api/v1/menu")
                         .accept(MediaType.APPLICATION_JSON))
+                .andDo(print()) // Print request/response details for debugging
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.menuTitle").value("Main Menu"))

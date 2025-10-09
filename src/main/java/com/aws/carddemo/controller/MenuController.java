@@ -267,7 +267,7 @@ public class MenuController {
      * @throws org.springframework.security.access.AccessDeniedException if user lacks ROLE_USER (returns 403 Forbidden)
      */
     @GetMapping("/menu")
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
     public ResponseEntity<MenuResponse> getMenu() {
         log.info("Processing GET /api/v1/menu request for main menu");
         
