@@ -570,6 +570,7 @@ public class TransactionReportJobConfig {
      * <p><b>Thread Safety:</b> Writer instance is @StepScope, so each step execution gets its own
      * writer with isolated state. Not thread-safe for parallel chunk processing.
      */
+    @Slf4j
     private static class TransactionReportWriter implements ItemWriter<Transaction> {
         
         private final String startDate;
