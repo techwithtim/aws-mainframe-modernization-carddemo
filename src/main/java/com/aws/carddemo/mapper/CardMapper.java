@@ -494,11 +494,13 @@ public interface CardMapper {
     @Mapping(source = "cardStatus", target = "activeStatus", 
              nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     @Mapping(target = "expirationDate", 
-             expression = "java(mapExpirationDate(request.getExpirationMonth(), request.getExpirationYear()))",
-             nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+             expression = "java(mapExpirationDate(request.getExpirationMonth(), request.getExpirationYear()))")
     @Mapping(target = "cardId", ignore = true)
     @Mapping(target = "cardNumber", ignore = true)
     @Mapping(target = "account", ignore = true)
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "version", ignore = true)
     void updateEntityFromRequest(CardUpdateRequest request, @MappingTarget Card entity);
 
     /**
