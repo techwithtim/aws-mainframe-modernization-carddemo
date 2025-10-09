@@ -200,6 +200,12 @@ public class TransactionReader {
     /**
      * Creates a JPA-based paginated ItemReader for Transaction entities with date range filtering.
      * 
+     * <p><b>Bean Name Disambiguation:</b> This bean method is named {@code dateRangeTransactionReader}
+     * to avoid bean naming conflict with the @Configuration class name {@code TransactionReader}.
+     * Spring would otherwise attempt to register two beans with the same name "transactionReader"
+     * (one for the configuration class, one for this @Bean method), causing a
+     * BeanDefinitionOverrideException at application context startup.
+     * 
      * <p><b>Method Signature:</b> This @Bean method is annotated with @StepScope to enable
      * late binding of JobParameters at step execution time. The method accepts startDate and
      * endDate string parameters injected from JobParameters via @Value SpEL expressions, along
@@ -343,7 +349,7 @@ public class TransactionReader {
      */
     @Bean
     @StepScope
-    public JpaPagingItemReader<Transaction> transactionReader(
+    public JpaPagingItemReader<Transaction> dateRangeTransactionReader(
             @Value("#{jobParameters['startDate']}") String startDate,
             @Value("#{jobParameters['endDate']}") String endDate,
             EntityManagerFactory entityManagerFactory) throws Exception {
