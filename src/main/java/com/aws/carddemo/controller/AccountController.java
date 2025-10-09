@@ -128,6 +128,8 @@ package com.aws.carddemo.controller;
 
 import com.aws.carddemo.dto.request.AccountUpdateRequest;
 import com.aws.carddemo.dto.response.AccountResponse;
+import com.aws.carddemo.mapper.AccountMapper;
+import com.aws.carddemo.model.Account;
 import com.aws.carddemo.service.AccountService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -169,6 +171,15 @@ public class AccountController {
      * COACTVWC.cbl and COACTUPC.cbl COBOL programs.
      */
     private final AccountService accountService;
+    
+    /**
+     * Account mapper for entity to DTO conversions.
+     * Injected via constructor dependency injection (Lombok @RequiredArgsConstructor).
+     * 
+     * This mapper converts Account entities to AccountResponse DTOs, flattening
+     * the Customer relationship and formatting data for JSON serialization.
+     */
+    private final AccountMapper accountMapper;
 
     /**
      * Retrieve account details by account ID.
@@ -295,7 +306,11 @@ public class AccountController {
         
         // Delegate to service layer for business logic execution
         // This replaces COBOL PERFORM 9000-READ-ACCT paragraph
-        AccountResponse accountResponse = accountService.getAccountById(id);
+        Account account = accountService.getAccountById(id);
+        
+        // Convert Account entity to AccountResponse DTO
+        // This replaces COBOL PERFORM 9100-SETUP-SCREEN field-by-field mapping
+        AccountResponse accountResponse = accountMapper.toResponse(account);
         
         // Log successful retrieval (account number masked in logs via Logback converter)
         log.info("Account inquiry completed successfully for account ID: {}, account number: {}", 
@@ -520,14 +535,18 @@ public class AccountController {
         // Bean Validation (@Valid) has already validated the request object
         // This replaces COBOL PERFORM 1000-VALIDATE-INPUT + PERFORM 9000-READ-FOR-UPDATE
         // + PERFORM 1100-APPLY-UPDATES + EXEC CICS REWRITE + EXEC CICS SYNCPOINT
-        AccountResponse updatedAccount = accountService.updateAccount(id, request);
+        Account updatedAccount = accountService.updateAccount(id, request);
+        
+        // Convert updated Account entity to AccountResponse DTO
+        // This replaces COBOL PERFORM 9100-SETUP-SCREEN response field mapping
+        AccountResponse accountResponse = accountMapper.toResponse(updatedAccount);
         
         // Log successful update (account number masked in logs)
         log.info("Account update completed successfully for account ID: {}, account number: {}", 
-                 id, updatedAccount.getAccountNumber());
+                 id, accountResponse.getAccountNumber());
         
         // Return HTTP 200 OK with updated account data
         // This replaces COBOL EXEC CICS SEND MAP('CACTUPA') with success message
-        return ResponseEntity.ok(updatedAccount);
+        return ResponseEntity.ok(accountResponse);
     }
 }
