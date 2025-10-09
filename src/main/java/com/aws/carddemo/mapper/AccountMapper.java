@@ -310,6 +310,9 @@ public interface AccountMapper {
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "version", ignore = true)
+    @Mapping(target = "activeStatus", source = "accountStatus")
+    @Mapping(target = "openDate", source = "accountOpenDate")
+    @Mapping(target = "expirationDate", source = "accountExpirationDate")
     Account toEntity(AccountUpdateRequest request);
 
     /**
