@@ -17,8 +17,6 @@
 
 package com.aws.carddemo.unit.controller;
 
-import com.aws.carddemo.config.BatchConfig;
-import com.aws.carddemo.config.DataSourceConfig;
 import com.aws.carddemo.controller.AdminController;
 import com.aws.carddemo.dto.request.UserCreateRequest;
 import com.aws.carddemo.dto.request.UserUpdateRequest;
@@ -27,16 +25,10 @@ import com.aws.carddemo.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentMatchers;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.batch.BatchAutoConfiguration;
-import org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration;
-import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
-import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.context.annotation.ComponentScan;
-import org.springframework.context.annotation.FilterType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -44,9 +36,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithAnonymousUser;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
-import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -124,18 +115,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @see UserResponse
  * @since 1.0.0
  */
-@WebMvcTest(
-    controllers = AdminController.class,
-    excludeAutoConfiguration = {
-        DataSourceAutoConfiguration.class,
-        HibernateJpaAutoConfiguration.class,
-        FlywayAutoConfiguration.class,
-        BatchAutoConfiguration.class
-    },
-    excludeFilters = @ComponentScan.Filter(
-        type = FilterType.ASSIGNABLE_TYPE,
-        classes = {BatchConfig.class, DataSourceConfig.class}
-    ))
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
 @DisplayName("AdminController Unit Tests")
 public class AdminControllerTest {
 
@@ -412,6 +394,7 @@ public class AdminControllerTest {
         UserCreateRequest request = UserCreateRequest.builder()
                 .userId("ADMIN002")
                 .password("SecureP@ss123")
+                .confirmPassword("SecureP@ss123")
                 .firstName("Jane")
                 .lastName("Smith")
                 .userType("A")
@@ -476,6 +459,7 @@ public class AdminControllerTest {
         UserCreateRequest request = UserCreateRequest.builder()
                 .userId("ADMIN001")
                 .password("SecureP@ss123")
+                .confirmPassword("SecureP@ss123")
                 .firstName("Duplicate")
                 .lastName("User")
                 .userType("A")
@@ -531,6 +515,7 @@ public class AdminControllerTest {
         UserCreateRequest request = UserCreateRequest.builder()
                 .userId("")  // Invalid: blank userId
                 .password("short")  // Invalid: too short
+                .confirmPassword("")  // Invalid: blank confirmPassword
                 .firstName("")  // Invalid: blank firstName
                 .lastName("")  // Invalid: blank lastName
                 .userType("X")  // Invalid: invalid userType
@@ -571,6 +556,7 @@ public class AdminControllerTest {
         UserCreateRequest request = UserCreateRequest.builder()
                 .userId("USER0010")
                 .password("weakpassword")  // Invalid: lacks complexity
+                .confirmPassword("weakpassword")
                 .firstName("Test")
                 .lastName("User")
                 .userType("R")
