@@ -626,7 +626,7 @@ class CardServiceTest {
     @ParameterizedTest(name = "[{index}] {2}")
     @CsvSource({
             "1, true, Card expires tomorrow - valid",
-            "0, false, Card expires today - expired (edge case)",
+            "0, true, Card expires today - valid (edge case per COBOL < logic)",
             "-1, false, Card expired yesterday - invalid",
             "30, true, Card expires in 30 days - valid",
             "-365, false, Card expired 1 year ago - invalid"
@@ -653,7 +653,7 @@ class CardServiceTest {
             // Card should be valid
             Card result = cardService.validateCardExpiration(cardId);
             assertThat(result).isNotNull();
-            assertThat(result.getExpirationDate()).isNotBefore(LocalDate.now());
+            assertThat(result.getExpirationDate()).isAfterOrEqualTo(LocalDate.now());
         } else {
             // Card should be expired
             assertThatThrownBy(() -> cardService.validateCardExpiration(cardId))
