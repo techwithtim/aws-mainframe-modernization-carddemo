@@ -1,5 +1,6 @@
 package com.aws.carddemo.batch.writer;
 
+import com.aws.carddemo.batch.dto.StatementData;
 import com.aws.carddemo.model.Account;
 import com.aws.carddemo.model.Customer;
 import com.aws.carddemo.model.Transaction;
@@ -136,7 +137,7 @@ import java.util.List;
  * @see Transaction for PCI-DSS compliant card number masking
  */
 @Component
-public class StatementWriter implements ItemWriter<StatementWriter.StatementData> {
+public class StatementWriter implements ItemWriter<StatementData> {
 
     private static final Logger logger = LoggerFactory.getLogger(StatementWriter.class);
     
@@ -245,15 +246,15 @@ public class StatementWriter implements ItemWriter<StatementWriter.StatementData
                 successCount++;
                 
                 logger.debug("Statement generated successfully for account: {}, date: {}, PDF size: {} bytes",
-                        statementData.getAccountNumber(),
-                        statementData.getStatementDate(),
+                        statementData.customerInfo().maskedAccountNumber(),
+                        statementData.statementPeriod().statementDate(),
                         pdfContent.length);
                         
             } catch (Exception e) {
                 errorCount++;
                 logger.error("Failed to generate statement for account: {}, date: {}",
-                        statementData.getAccountNumber(),
-                        statementData.getStatementDate(),
+                        statementData.customerInfo().maskedAccountNumber(),
+                        statementData.statementPeriod().statementDate(),
                         e);
                 // Continue processing remaining statements in chunk
             }
@@ -328,21 +329,21 @@ public class StatementWriter implements ItemWriter<StatementWriter.StatementData
         context.setVariable("statement", statementData);
         
         // Add formatted dates
-        context.setVariable("statementDate", statementData.getStatementDate().format(DISPLAY_DATE_FORMATTER));
-        context.setVariable("dueDate", statementData.getStatementDate().plusDays(21).format(DISPLAY_DATE_FORMATTER));
+        context.setVariable("statementDate", statementData.statementPeriod().statementDate().format(DISPLAY_DATE_FORMATTER));
+        context.setVariable("dueDate", statementData.statementPeriod().statementDate().plusDays(21).format(DISPLAY_DATE_FORMATTER));
         
         // Calculate minimum payment due: max($25.00, 2% of current balance)
-        BigDecimal minimumPaymentDue = calculateMinimumPayment(statementData.getCurrentBalance());
+        BigDecimal minimumPaymentDue = calculateMinimumPayment(statementData.accountSummary().currentBalance());
         context.setVariable("minimumPaymentDue", minimumPaymentDue);
         
         // Process template
         try {
             String htmlContent = templateEngine.process("statement-template", context);
-            logger.debug("HTML statement generated for account: {}", statementData.getAccountNumber());
+            logger.debug("HTML statement generated for account: {}", statementData.customerInfo().maskedAccountNumber());
             return htmlContent;
         } catch (Exception e) {
             logger.error("Thymeleaf template processing failed for account: {}",
-                    statementData.getAccountNumber(), e);
+                    statementData.customerInfo().maskedAccountNumber(), e);
             throw new RuntimeException("Failed to generate HTML statement", e);
         }
     }
@@ -384,8 +385,8 @@ public class StatementWriter implements ItemWriter<StatementWriter.StatementData
      */
     private Path writeHtmlFile(StatementData statementData, String htmlContent) throws IOException {
         String fileName = String.format("%s_%s.html",
-                statementData.getAccountNumber(),
-                statementData.getStatementDate().format(DATE_FORMATTER));
+                statementData.customerInfo().maskedAccountNumber(),
+                statementData.statementPeriod().statementDate().format(DATE_FORMATTER));
         
         Path htmlPath = Paths.get(baseOutputPath, htmlSubdirectory, fileName);
         Files.write(htmlPath, htmlContent.getBytes(StandardCharsets.UTF_8));
@@ -446,8 +447,8 @@ public class StatementWriter implements ItemWriter<StatementWriter.StatementData
      */
     private Path writePdfFile(StatementData statementData, byte[] pdfContent) throws IOException {
         String fileName = String.format("%s_%s.pdf",
-                statementData.getAccountNumber(),
-                statementData.getStatementDate().format(DATE_FORMATTER));
+                statementData.customerInfo().maskedAccountNumber(),
+                statementData.statementPeriod().statementDate().format(DATE_FORMATTER));
         
         Path pdfPath = Paths.get(baseOutputPath, pdfSubdirectory, fileName);
         Files.write(pdfPath, pdfContent);
@@ -474,11 +475,11 @@ public class StatementWriter implements ItemWriter<StatementWriter.StatementData
      */
     private void uploadToS3(StatementData statementData, Path pdfPath) {
         try {
-            LocalDate statementDate = statementData.getStatementDate();
+            LocalDate statementDate = statementData.statementPeriod().statementDate();
             String s3Key = String.format("%d/%02d/%s.pdf",
                     statementDate.getYear(),
                     statementDate.getMonthValue(),
-                    statementData.getAccountNumber());
+                    statementData.customerInfo().maskedAccountNumber());
             
             PutObjectRequest putRequest = PutObjectRequest.builder()
                     .bucket(s3BucketName)
@@ -492,172 +493,9 @@ public class StatementWriter implements ItemWriter<StatementWriter.StatementData
             
         } catch (Exception e) {
             logger.warn("S3 upload failed for account: {} - local file preserved",
-                    statementData.getAccountNumber(), e);
+                    statementData.customerInfo().maskedAccountNumber(), e);
             // Non-fatal: local file write succeeded, S3 upload is optional archival
         }
     }
 
-    /**
-     * Data Transfer Object containing all data required for statement generation.
-     * 
-     * <p><b>Purpose:</b> This DTO encapsulates formatted statement content passed from the
-     * processor to the writer. It aggregates data from multiple entities (Account, Customer,
-     * Transaction) into a single cohesive structure optimized for template rendering.
-     * 
-     * <p><b>Source Data:</b>
-     * <ul>
-     *   <li><b>Account:</b> Account number, current balance, credit limit from Account entity</li>
-     *   <li><b>Customer:</b> Name and mailing address from Customer entity</li>
-     *   <li><b>Transactions:</b> List of TransactionDTO objects with date, description, amount</li>
-     *   <li><b>Finance Charges:</b> Aggregated interest charges from TransactionCategoryBalance</li>
-     * </ul>
-     * 
-     * <p><b>Field Descriptions:</b>
-     * <ul>
-     *   <li><b>accountNumber:</b> 11-digit account identifier (preserving leading zeros)</li>
-     *   <li><b>statementDate:</b> Statement generation date (typically last day of month)</li>
-     *   <li><b>statementPeriod:</b> Human-readable period (e.g., "January 2024")</li>
-     *   <li><b>customerName:</b> Full name formatted as "LAST, FIRST MIDDLE"</li>
-     *   <li><b>customerAddress:</b> Mailing address lines from Customer entity</li>
-     *   <li><b>previousBalance:</b> Balance at start of statement period</li>
-     *   <li><b>currentBalance:</b> Balance at end of statement period</li>
-     *   <li><b>transactions:</b> All transactions posted during statement period</li>
-     *   <li><b>totalDebits:</b> Sum of all debit transactions (purchases, fees)</li>
-     *   <li><b>totalCredits:</b> Sum of all credit transactions (payments, refunds)</li>
-     *   <li><b>financeCharges:</b> Total interest charges for the period</li>
-     * </ul>
-     * 
-     * <p><b>Immutability:</b> All fields are final ensuring thread-safe statement generation
-     * in multi-threaded Spring Batch steps.
-     */
-    public static class StatementData {
-        private final String accountNumber;
-        private final LocalDate statementDate;
-        private final String statementPeriod;
-        private final String customerName;
-        private final String addressLine1;
-        private final String addressLine2;
-        private final String addressLine3;
-        private final String city;
-        private final String stateCode;
-        private final String zipCode;
-        private final BigDecimal previousBalance;
-        private final BigDecimal currentBalance;
-        private final BigDecimal creditLimit;
-        private final Integer ficoScore;
-        private final List<TransactionDTO> transactions;
-        private final BigDecimal totalDebits;
-        private final BigDecimal totalCredits;
-        private final BigDecimal financeCharges;
-
-        /**
-         * Full constructor for statement data initialization.
-         *
-         * @param accountNumber 11-digit account number
-         * @param statementDate statement generation date
-         * @param statementPeriod human-readable period string
-         * @param customerName formatted customer name
-         * @param addressLine1 primary address line
-         * @param addressLine2 secondary address line (may be null)
-         * @param addressLine3 tertiary address line (may be null)
-         * @param city city name
-         * @param stateCode 2-letter state code
-         * @param zipCode ZIP code (5 or 9 digits)
-         * @param previousBalance balance at period start
-         * @param currentBalance balance at period end
-         * @param creditLimit account credit limit
-         * @param ficoScore customer FICO credit score
-         * @param transactions list of transaction DTOs
-         * @param totalDebits sum of debit transactions
-         * @param totalCredits sum of credit transactions
-         * @param financeCharges total interest charges
-         */
-        public StatementData(String accountNumber, LocalDate statementDate, String statementPeriod,
-                           String customerName, String addressLine1, String addressLine2,
-                           String addressLine3, String city, String stateCode, String zipCode,
-                           BigDecimal previousBalance, BigDecimal currentBalance, BigDecimal creditLimit,
-                           Integer ficoScore, List<TransactionDTO> transactions,
-                           BigDecimal totalDebits, BigDecimal totalCredits, BigDecimal financeCharges) {
-            this.accountNumber = accountNumber;
-            this.statementDate = statementDate;
-            this.statementPeriod = statementPeriod;
-            this.customerName = customerName;
-            this.addressLine1 = addressLine1;
-            this.addressLine2 = addressLine2;
-            this.addressLine3 = addressLine3;
-            this.city = city;
-            this.stateCode = stateCode;
-            this.zipCode = zipCode;
-            this.previousBalance = previousBalance;
-            this.currentBalance = currentBalance;
-            this.creditLimit = creditLimit;
-            this.ficoScore = ficoScore;
-            this.transactions = transactions;
-            this.totalDebits = totalDebits;
-            this.totalCredits = totalCredits;
-            this.financeCharges = financeCharges;
-        }
-
-        // Getters
-        public String getAccountNumber() { return accountNumber; }
-        public LocalDate getStatementDate() { return statementDate; }
-        public String getStatementPeriod() { return statementPeriod; }
-        public String getCustomerName() { return customerName; }
-        public String getAddressLine1() { return addressLine1; }
-        public String getAddressLine2() { return addressLine2; }
-        public String getAddressLine3() { return addressLine3; }
-        public String getCity() { return city; }
-        public String getStateCode() { return stateCode; }
-        public String getZipCode() { return zipCode; }
-        public BigDecimal getPreviousBalance() { return previousBalance; }
-        public BigDecimal getCurrentBalance() { return currentBalance; }
-        public BigDecimal getCreditLimit() { return creditLimit; }
-        public Integer getFicoScore() { return ficoScore; }
-        public List<TransactionDTO> getTransactions() { return transactions; }
-        public BigDecimal getTotalDebits() { return totalDebits; }
-        public BigDecimal getTotalCredits() { return totalCredits; }
-        public BigDecimal getFinanceCharges() { return financeCharges; }
-    }
-
-    /**
-     * Data Transfer Object for transaction details in statements.
-     * 
-     * <p><b>Purpose:</b> Simplified transaction representation for statement display,
-     * containing only fields needed for customer-facing statement rendering.
-     * 
-     * <p><b>PCI-DSS Compliance:</b> Card number is pre-masked before populating this DTO,
-     * ensuring no full card numbers exist in statement generation pipeline.
-     */
-    public static class TransactionDTO {
-        private final LocalDateTime transactionDate;
-        private final String transactionId;
-        private final String description;
-        private final BigDecimal amount;
-        private final String maskedCardNumber;
-
-        /**
-         * Constructor for transaction DTO.
-         *
-         * @param transactionDate date and time of transaction
-         * @param transactionId transaction reference number
-         * @param description transaction description for statement
-         * @param amount transaction amount
-         * @param maskedCardNumber PCI-DSS masked card number (XXXX-XXXX-XXXX-1234)
-         */
-        public TransactionDTO(LocalDateTime transactionDate, String transactionId,
-                            String description, BigDecimal amount, String maskedCardNumber) {
-            this.transactionDate = transactionDate;
-            this.transactionId = transactionId;
-            this.description = description;
-            this.amount = amount;
-            this.maskedCardNumber = maskedCardNumber;
-        }
-
-        // Getters
-        public LocalDateTime getTransactionDate() { return transactionDate; }
-        public String getTransactionId() { return transactionId; }
-        public String getDescription() { return description; }
-        public BigDecimal getAmount() { return amount; }
-        public String getMaskedCardNumber() { return maskedCardNumber; }
-    }
 }
