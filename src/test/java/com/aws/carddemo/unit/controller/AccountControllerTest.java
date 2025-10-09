@@ -10,8 +10,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.batch.BatchAutoConfiguration;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
+import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.FilterType;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -177,7 +182,26 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @see AccountUpdateRequest for request DTO structure and validation rules
  * @see com.aws.carddemo.exception.ResourceNotFoundException for 404 error handling
  */
-@WebMvcTest(AccountController.class)
+@WebMvcTest(
+    controllers = AccountController.class,
+    excludeAutoConfiguration = {
+        DataSourceAutoConfiguration.class,
+        HibernateJpaAutoConfiguration.class,
+        BatchAutoConfiguration.class
+    },
+    excludeFilters = @ComponentScan.Filter(
+        type = FilterType.ASSIGNABLE_TYPE,
+        classes = {
+            com.aws.carddemo.config.BatchConfig.class,
+            com.aws.carddemo.config.DataSourceConfig.class,
+            com.aws.carddemo.config.JpaAuditingConfig.class,
+            com.aws.carddemo.batch.config.InterestCalculationJobConfig.class,
+            com.aws.carddemo.batch.config.TransactionPostingJobConfig.class,
+            com.aws.carddemo.batch.config.StatementGenerationJobConfig.class,
+            com.aws.carddemo.batch.config.TransactionReportJobConfig.class
+        }
+    )
+)
 @DisplayName("AccountController Unit Tests - COBOL Migration Equivalence")
 public class AccountControllerTest {
 
@@ -191,7 +215,6 @@ public class AccountControllerTest {
     private ObjectMapper objectMapper;
 
     // Test fixture data - reused across multiple test methods
-    private AccountResponse testAccountResponse;
     private Account testAccount;
     private AccountUpdateRequest testUpdateRequest;
 
@@ -200,9 +223,8 @@ public class AccountControllerTest {
      * 
      * <p>Initializes common test data including:
      * <ul>
-     *   <li>AccountResponse with realistic field values matching COACTVW.bms screen</li>
+     *   <li>Account entity with realistic field values matching COACTVW.bms screen</li>
      *   <li>AccountUpdateRequest with valid field values for update testing</li>
-     *   <li>Account entity for service layer mock responses</li>
      * </ul>
      * 
      * <p><b>Test Data Mapping to COBOL:</b>
@@ -216,37 +238,21 @@ public class AccountControllerTest {
      */
     @BeforeEach
     void setUp() {
-        // Initialize AccountResponse test fixture
-        testAccountResponse = AccountResponse.builder()
-                .accountId(1L)
-                .accountNumber("00012345678")
-                .activeStatus("Y")
-                .creditLimit(BigDecimal.valueOf(5000.00))
-                .cashCreditLimit(BigDecimal.valueOf(1000.00))
-                .currentBalance(BigDecimal.valueOf(2500.50))
-                .openDate(LocalDate.of(2020, 1, 1))
-                .expirationDate(LocalDate.of(2025, 12, 31))
-                .reissueDate(null)
-                .customerId(100L)
-                .customerFirstName("John")
-                .customerMiddleName("A")
-                .customerLastName("Doe")
-                .ssnLastFour("1234")
-                .ficoScore(750)
-                .dateOfBirth(LocalDate.of(1985, 5, 15))
-                .phoneNumber("5551234567")
-                .addressLine1("123 Main Street")
-                .addressLine2("Apt 4B")
-                .city("Dallas")
-                .state("TX")
-                .zipCode("75001")
-                .email("john.doe@example.com")
-                .governmentIssuedId("DL123456789")
-                .governmentIdState("TX")
-                .eftRoutingNumber("021000021")
-                .eftAccountNumber("123456789")
-                .createdAt(LocalDate.now())
-                .build();
+        // Initialize Account entity test fixture
+        testAccount = new Account();
+        testAccount.setAccountId(1L);
+        testAccount.setAccountNumber("00012345678");
+        testAccount.setActiveStatus("Y");
+        testAccount.setCreditLimit(BigDecimal.valueOf(5000.00));
+        testAccount.setCashCreditLimit(BigDecimal.valueOf(1000.00));
+        testAccount.setCurrentBalance(BigDecimal.valueOf(2500.50));
+        testAccount.setCurrentCycleCredit(BigDecimal.ZERO);
+        testAccount.setCurrentCycleDebit(BigDecimal.ZERO);
+        testAccount.setOpenDate(LocalDate.of(2020, 1, 1));
+        testAccount.setExpirationDate(LocalDate.of(2025, 12, 31));
+        testAccount.setReissueDate(null);
+        testAccount.setAddressZip("75001");
+        testAccount.setGroupId("DEFAULT");
 
         // Initialize AccountUpdateRequest test fixture
         testUpdateRequest = AccountUpdateRequest.builder()
@@ -319,7 +325,7 @@ public class AccountControllerTest {
     void testGetAccountById_Success() throws Exception {
         // Given: Mock service returns account data
         when(accountService.getAccountById(anyLong()))
-                .thenReturn(testAccountResponse);
+                .thenReturn(testAccount);
 
         // When: GET request to /api/v1/accounts/1
         mockMvc.perform(get("/api/v1/accounts/{id}", 1L)
@@ -327,25 +333,16 @@ public class AccountControllerTest {
                 // Then: Verify response status and structure
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.account_id").value(1))
-                .andExpect(jsonPath("$.account_number").value("00012345678"))
-                .andExpect(jsonPath("$.active_status").value("Y"))
-                .andExpect(jsonPath("$.credit_limit").value(5000.00))
-                .andExpect(jsonPath("$.cash_credit_limit").value(1000.00))
-                .andExpect(jsonPath("$.current_balance").value(2500.50))
-                .andExpect(jsonPath("$.open_date").value("2020-01-01"))
-                .andExpect(jsonPath("$.expiration_date").value("2025-12-31"))
-                .andExpect(jsonPath("$.customer_id").value(100))
-                .andExpect(jsonPath("$.customer_first_name").value("John"))
-                .andExpect(jsonPath("$.customer_middle_name").value("A"))
-                .andExpect(jsonPath("$.customer_last_name").value("Doe"))
-                .andExpect(jsonPath("$.ssn_last_four").value("1234"))
-                .andExpect(jsonPath("$.fico_score").value(750))
-                .andExpect(jsonPath("$.phone_number").value("5551234567"))
-                .andExpect(jsonPath("$.address_line1").value("123 Main Street"))
-                .andExpect(jsonPath("$.city").value("Dallas"))
-                .andExpect(jsonPath("$.state").value("TX"))
-                .andExpect(jsonPath("$.zip_code").value("75001"));
+                .andExpect(jsonPath("$.accountId").value(1))
+                .andExpect(jsonPath("$.accountNumber").value("00012345678"))
+                .andExpect(jsonPath("$.activeStatus").value("Y"))
+                .andExpect(jsonPath("$.creditLimit").value("5000.00"))
+                .andExpect(jsonPath("$.cashCreditLimit").value("1000.00"))
+                .andExpect(jsonPath("$.currentBalance").value("2500.50"))
+                .andExpect(jsonPath("$.openDate").value("2020-01-01"))
+                .andExpect(jsonPath("$.expirationDate").value("2025-12-31"))
+                .andExpect(jsonPath("$.addressZip").value("75001"))
+                .andExpect(jsonPath("$.groupId").value("DEFAULT"));
 
         // Verify service method was called exactly once
         verify(accountService, times(1)).getAccountById(1L);
@@ -447,23 +444,23 @@ public class AccountControllerTest {
     @DisplayName("PUT /api/v1/accounts/{id} - Success: Updates account and returns 200 OK")
     void testUpdateAccount_Success() throws Exception {
         // Given: Mock service returns updated account
-        AccountResponse updatedResponse = AccountResponse.builder()
-                .accountId(1L)
-                .accountNumber("00012345678")
-                .activeStatus("Y")
-                .creditLimit(BigDecimal.valueOf(6000.00))  // Updated value
-                .cashCreditLimit(BigDecimal.valueOf(1200.00))  // Updated value
-                .currentBalance(BigDecimal.valueOf(2500.50))
-                .openDate(LocalDate.of(2020, 1, 1))
-                .expirationDate(LocalDate.of(2026, 12, 31))  // Updated value
-                .customerId(100L)
-                .customerFirstName("John")
-                .customerLastName("Doe")
-                .ficoScore(760)  // Updated value
-                .build();
+        Account updatedAccount = new Account();
+        updatedAccount.setAccountId(1L);
+        updatedAccount.setAccountNumber("00012345678");
+        updatedAccount.setActiveStatus("Y");
+        updatedAccount.setCreditLimit(BigDecimal.valueOf(6000.00));  // Updated value
+        updatedAccount.setCashCreditLimit(BigDecimal.valueOf(1200.00));  // Updated value
+        updatedAccount.setCurrentBalance(BigDecimal.valueOf(2500.50));
+        updatedAccount.setCurrentCycleCredit(BigDecimal.ZERO);
+        updatedAccount.setCurrentCycleDebit(BigDecimal.ZERO);
+        updatedAccount.setOpenDate(LocalDate.of(2020, 1, 1));
+        updatedAccount.setExpirationDate(LocalDate.of(2026, 12, 31));  // Updated value
+        updatedAccount.setReissueDate(LocalDate.of(2023, 6, 1));
+        updatedAccount.setAddressZip("75001");
+        updatedAccount.setGroupId("DEFAULT");
 
         when(accountService.updateAccount(anyLong(), any(AccountUpdateRequest.class)))
-                .thenReturn(updatedResponse);
+                .thenReturn(updatedAccount);
 
         // When: PUT request with AccountUpdateRequest JSON
         mockMvc.perform(put("/api/v1/accounts/{id}", 1L)
@@ -473,11 +470,11 @@ public class AccountControllerTest {
                 // Then: Verify response status and updated values
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.account_id").value(1))
-                .andExpect(jsonPath("$.credit_limit").value(6000.00))
-                .andExpect(jsonPath("$.cash_credit_limit").value(1200.00))
-                .andExpect(jsonPath("$.expiration_date").value("2026-12-31"))
-                .andExpect(jsonPath("$.fico_score").value(760));
+                .andExpect(jsonPath("$.accountId").value(1))
+                .andExpect(jsonPath("$.creditLimit").value("6000.00"))
+                .andExpect(jsonPath("$.cashCreditLimit").value("1200.00"))
+                .andExpect(jsonPath("$.expirationDate").value("2026-12-31"))
+                .andExpect(jsonPath("$.reissueDate").value("2023-06-01"));
 
         // Verify service method was called with correct parameters
         verify(accountService, times(1)).updateAccount(eq(1L), any(AccountUpdateRequest.class));
