@@ -305,26 +305,26 @@ public class TransactionWriter implements ItemWriter<ProcessedTransaction> {
         int errorCount = 0;
         
         for (ProcessedTransaction processedTxn : allItems) {
-            ProcessedTransaction.ProcessingStatus status = processedTxn.getStatus();
+            ProcessedTransaction.ProcessingStatus status = processedTxn.status();
             
             if (status == ProcessedTransaction.ProcessingStatus.APPROVED) {
                 approvedTransactions.add(processedTxn);
                 logger.debug("Approved transaction: ID={}, AccountId={}, Amount={}", 
-                    processedTxn.getTransactionId(), 
-                    processedTxn.getAccountId(), 
-                    processedTxn.getAmount());
+                    processedTxn.transactionId(), 
+                    processedTxn.accountId(), 
+                    processedTxn.amount());
             } else if (status == ProcessedTransaction.ProcessingStatus.DECLINED) {
                 declinedCount++;
                 logger.warn("Declined transaction: ID={}, ErrorCode={}, ErrorMessage={}", 
-                    processedTxn.getTransactionId(), 
-                    processedTxn.getErrorCode(), 
-                    processedTxn.getErrorMessage());
+                    processedTxn.transactionId(), 
+                    processedTxn.errorCode(), 
+                    processedTxn.errorMessage());
             } else if (status == ProcessedTransaction.ProcessingStatus.ERROR) {
                 errorCount++;
                 logger.error("Error processing transaction: ID={}, ErrorCode={}, ErrorMessage={}", 
-                    processedTxn.getTransactionId(), 
-                    processedTxn.getErrorCode(), 
-                    processedTxn.getErrorMessage());
+                    processedTxn.transactionId(), 
+                    processedTxn.errorCode(), 
+                    processedTxn.errorMessage());
             }
         }
         
@@ -344,22 +344,22 @@ public class TransactionWriter implements ItemWriter<ProcessedTransaction> {
             Transaction transaction = transactionMapper.toEntity(null); // Create base entity
             
             // Manual field mapping since we're converting from ProcessedTransaction, not TransactionRequest
-            transaction.setTransactionNumber(processedTxn.getTransactionId());
-            transaction.setTransactionTypeCode(processedTxn.getTransactionTypeCode());
-            transaction.setTransactionCategoryCode(processedTxn.getTransactionCategoryCode());
-            transaction.setAmount(processedTxn.getAmount());
+            transaction.setTransactionNumber(processedTxn.transactionId());
+            transaction.setTransactionTypeCode(processedTxn.transactionTypeCode());
+            transaction.setTransactionCategoryCode(processedTxn.transactionCategoryCode());
+            transaction.setAmount(processedTxn.amount());
             transaction.setDescription("Transaction posted from daily feed");
-            transaction.setMerchantId(processedTxn.getMerchantId());
-            transaction.setMerchantName(processedTxn.getMerchantName());
-            transaction.setMerchantCity(processedTxn.getMerchantCity());
-            transaction.setMerchantZip(processedTxn.getMerchantZip());
-            transaction.setOriginalTimestamp(processedTxn.getTransactionTimestamp());
+            transaction.setMerchantId(processedTxn.merchantId());
+            transaction.setMerchantName(processedTxn.merchantName());
+            transaction.setMerchantCity(processedTxn.merchantCity());
+            transaction.setMerchantZip(processedTxn.merchantZip());
+            transaction.setOriginalTimestamp(processedTxn.transactionTimestamp());
             transaction.setProcessingTimestamp(LocalDateTime.now());
             
             // Resolve account from accountId
-            Account account = accountRepository.findById(processedTxn.getAccountId())
+            Account account = accountRepository.findById(processedTxn.accountId())
                 .orElseThrow(() -> new IllegalStateException(
-                    "Account not found: " + processedTxn.getAccountId() + 
+                    "Account not found: " + processedTxn.accountId() + 
                     " - should have been validated by TransactionProcessor"));
             transaction.setAccount(account);
             
@@ -379,16 +379,16 @@ public class TransactionWriter implements ItemWriter<ProcessedTransaction> {
         
         logger.info("Successfully inserted {} transactions to database", savedTransactions.size());
         
-        // Step 4: Update DailyTransaction.processed=true to prevent duplicate processing
+        // Step 4: Update DailyTransaction.processingStatus='PROCESSED' to prevent duplicate processing
         List<String> transactionIds = approvedTransactions.stream()
-            .map(ProcessedTransaction::getTransactionId)
+            .map(ProcessedTransaction::transactionId)
             .collect(Collectors.toList());
         
         logger.info("Marking {} daily transactions as processed", transactionIds.size());
         
         List<DailyTransaction> dailyTransactions = dailyTransactionRepository.findByTransactionIdIn(transactionIds);
         for (DailyTransaction dailyTxn : dailyTransactions) {
-            dailyTxn.setProcessed(Boolean.TRUE);
+            dailyTxn.setProcessingStatus("PROCESSED");
         }
         dailyTransactionRepository.saveAll(dailyTransactions);
         
@@ -427,7 +427,6 @@ public class TransactionWriter implements ItemWriter<ProcessedTransaction> {
                 accountId, currentBalance, delta, newBalance);
             
             account.setCurrentBalance(newBalance);
-            account.setLastTransactionDate(LocalDate.now());
             
             accountRepository.save(account);
             
@@ -466,14 +465,28 @@ public class TransactionWriter implements ItemWriter<ProcessedTransaction> {
             String categoryCode = parts[1];
             BigDecimal delta = entry.getValue();
             
-            TransactionCategoryBalance categoryBalance = transactionCategoryBalanceRepository
-                .findByAccountIdAndCategoryCode(accountId, categoryCode)
-                .orElseGet(() -> {
-                    TransactionCategoryBalance newBalance = new TransactionCategoryBalance();
-                    // Set account and category code fields
-                    // Note: Actual field setting depends on TransactionCategoryBalance entity structure
-                    return newBalance;
-                });
+            List<TransactionCategoryBalance> existingBalances = transactionCategoryBalanceRepository
+                .findByAccountIdAndTransactionCategoryCode(accountId, categoryCode);
+            
+            TransactionCategoryBalance categoryBalance;
+            if (existingBalances.isEmpty()) {
+                // Create new category balance record
+                categoryBalance = new TransactionCategoryBalance();
+                categoryBalance.setAccountId(accountId);
+                categoryBalance.setTransactionCategoryCode(categoryCode);
+                categoryBalance.setCategoryBalance(BigDecimal.ZERO);
+                categoryBalance.setLastUpdated(LocalDateTime.now());
+                
+                logger.debug("Creating new category balance record: AccountId={}, CategoryCode={}", 
+                    accountId, categoryCode);
+            } else {
+                // Use existing record (should only be one, but take first if multiple)
+                categoryBalance = existingBalances.get(0);
+                if (existingBalances.size() > 1) {
+                    logger.warn("Found {} category balance records for AccountId={}, CategoryCode={} - using first", 
+                        existingBalances.size(), accountId, categoryCode);
+                }
+            }
             
             BigDecimal currentCategoryBalance = categoryBalance.getCategoryBalance() != null 
                 ? categoryBalance.getCategoryBalance() 
@@ -484,6 +497,7 @@ public class TransactionWriter implements ItemWriter<ProcessedTransaction> {
                 accountId, categoryCode, delta, newCategoryBalance);
             
             categoryBalance.setCategoryBalance(newCategoryBalance);
+            categoryBalance.setLastUpdated(LocalDateTime.now());
             transactionCategoryBalanceRepository.save(categoryBalance);
             
             categoryUpdates++;

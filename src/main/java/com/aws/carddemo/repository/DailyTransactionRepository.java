@@ -304,6 +304,23 @@ public interface DailyTransactionRepository extends JpaRepository<DailyTransacti
      */
     List<DailyTransaction> findByProcessingStatusOrderByOriginalTimestampAsc(String processingStatus, Pageable pageable);
 
+    /**
+     * Find all daily transactions with transaction IDs in the given collection.
+     * 
+     * <p>This method is used by TransactionWriter to retrieve daily transaction records
+     * after posting them to the transaction history table, in order to update their
+     * processing status from 'PENDING' to 'PROCESSED'.</p>
+     * 
+     * <p>Spring Data JPA derives the query implementation from the method name:
+     * <code>findByTransactionIdIn</code> → SELECT ... WHERE transaction_id IN (?)</p>
+     * 
+     * @param transactionIds Collection of transaction IDs to search for
+     * @return List of daily transaction records matching the transaction IDs
+     * @throws IllegalArgumentException if transactionIds is null
+     * @throws org.springframework.dao.DataAccessException if database query fails
+     */
+    List<DailyTransaction> findByTransactionIdIn(List<String> transactionIds);
+
     // NOTE: Additional methods are inherited from JpaRepository<DailyTransaction, Long>:
     //
     // <S extends DailyTransaction> S save(S entity)
