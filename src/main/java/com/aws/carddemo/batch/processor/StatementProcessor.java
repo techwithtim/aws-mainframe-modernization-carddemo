@@ -6,7 +6,6 @@
 package com.aws.carddemo.batch.processor;
 
 import com.aws.carddemo.batch.dto.AccountTransactionGroup;
-import com.aws.carddemo.batch.dto.FormattedTransaction;
 import com.aws.carddemo.batch.dto.StatementData;
 import com.aws.carddemo.model.Account;
 import com.aws.carddemo.model.Customer;
@@ -173,7 +172,7 @@ import java.util.stream.Collectors;
  * 
  * @see AccountTransactionGroup Input DTO containing grouped transaction data
  * @see StatementData Output DTO ready for template rendering
- * @see FormattedTransaction Individual transaction line DTO
+ * @see StatementData.FormattedTransaction Individual transaction line DTO
  * @author CardDemo Modernization Team (AWS)
  * @since 1.0.0
  */
@@ -376,7 +375,7 @@ public class StatementProcessor implements ItemProcessor<AccountTransactionGroup
         LocalDate paymentDueDate = input.statementPeriodEndDate().plusDays(PAYMENT_DUE_DAYS);
 
         // Format transaction list chronologically
-        List<FormattedTransaction> formattedTransactions = formatTransactionList(input.transactions());
+        List<StatementData.FormattedTransaction> formattedTransactions = formatTransactionList(input.transactions());
 
         // Format customer information with PCI-DSS compliant masking
         StatementData.CustomerInfo customerInfo = formatCustomerInfo(
@@ -666,7 +665,7 @@ public class StatementProcessor implements ItemProcessor<AccountTransactionGroup
      *       <li>Format amount as currency with $ symbol</li>
      *     </ul>
      *   </li>
-     *   <li>Return list of FormattedTransaction DTOs</li>
+     *   <li>Return list of StatementData.FormattedTransaction DTOs</li>
      * </ol>
      * 
      * <p><b>Sorting Logic:</b>
@@ -680,7 +679,7 @@ public class StatementProcessor implements ItemProcessor<AccountTransactionGroup
      * @param transactions List of all transactions in statement period
      * @return List of formatted transactions ready for template rendering, empty list if no transactions
      */
-    private List<FormattedTransaction> formatTransactionList(List<Transaction> transactions) {
+    private List<StatementData.FormattedTransaction> formatTransactionList(List<Transaction> transactions) {
         return transactions.stream()
                 // Sort chronologically by processingTimestamp, then by transactionId
                 .sorted(Comparator.comparing(Transaction::getProcessingTimestamp)
@@ -692,7 +691,7 @@ public class StatementProcessor implements ItemProcessor<AccountTransactionGroup
     }
 
     /**
-     * Formats a single transaction into display-ready FormattedTransaction DTO.
+     * Formats a single transaction into display-ready StatementData.FormattedTransaction DTO.
      * 
      * <p><b>COBOL Mapping:</b> Formats individual transaction fields matching
      * {@code STATEMENT-LINES ST-LINE14} structure:</p>
@@ -711,9 +710,9 @@ public class StatementProcessor implements ItemProcessor<AccountTransactionGroup
      * </ul>
      * 
      * @param transaction Transaction entity to format
-     * @return FormattedTransaction DTO ready for template rendering
+     * @return StatementData.FormattedTransaction DTO ready for template rendering
      */
-    private FormattedTransaction formatTransaction(Transaction transaction) {
+    private StatementData.FormattedTransaction formatTransaction(Transaction transaction) {
         // Format transaction date from LocalDateTime to MM/dd/yyyy string
         LocalDateTime timestamp = transaction.getProcessingTimestamp();
         String formattedDate = timestamp.toLocalDate().format(DATE_FORMATTER);
@@ -738,7 +737,7 @@ public class StatementProcessor implements ItemProcessor<AccountTransactionGroup
         String formattedAmount = currencyFormatter.format(transaction.getAmount());
 
         // Return formatted transaction DTO
-        return new FormattedTransaction(
+        return new StatementData.FormattedTransaction(
                 formattedDate,
                 description,
                 referenceNumber,
