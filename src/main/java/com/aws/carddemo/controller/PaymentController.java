@@ -645,7 +645,7 @@ public class PaymentController {
             description = "Payment processed successfully. Returns payment confirmation with new balance and transaction ID.",
             content = @Content(
                 mediaType = "application/json",
-                schema = @Schema(implementation = com.aws.carddemo.service.PaymentService.PaymentResponse.class)
+                schema = @Schema(implementation = com.aws.carddemo.dto.response.PaymentResponse.class)
             )
         ),
         @ApiResponse(
