@@ -5,10 +5,11 @@
 
 package com.aws.carddemo.batch.config;
 
+import com.aws.carddemo.batch.dto.AccountTransactionGroup;
+import com.aws.carddemo.batch.dto.StatementData;
 import com.aws.carddemo.batch.processor.StatementProcessor;
 import com.aws.carddemo.batch.reader.TransactionReader;
 import com.aws.carddemo.batch.writer.StatementWriter;
-import com.aws.carddemo.model.Transaction;
 import jakarta.persistence.EntityManagerFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -417,12 +418,13 @@ public class StatementGenerationJobConfig {
      * <p><b>Component Integration:</b></p>
      * <ul>
      *   <li><b>TransactionReader:</b> Autowired @Bean from TransactionReader configuration class.
-     *       Returns configured JpaPagingItemReader&lt;Transaction&gt; with date range filtering.
-     *       The reader's bean method {@code dateRangeTransactionReader(startDate, endDate, emf)}
-     *       is invoked by Spring with JobParameters injection.</li>
+     *       Returns configured ItemReader&lt;AccountTransactionGroup&gt; that groups transactions by account.
+     *       The reader's bean method {@code accountTransactionGroupReader(startDate, endDate, emf)}
+     *       is invoked by Spring with JobParameters injection. This matches COBOL CBSTM03A.CBL
+     *       pattern where all transactions for one account are loaded before processing.</li>
      *   <li><b>StatementProcessor:</b> Autowired @Component implementing ItemProcessor interface.
-     *       Transforms Transaction entities into StatementData DTOs with formatting, calculations,
-     *       and PCI-DSS compliant masking.</li>
+     *       Transforms AccountTransactionGroup DTOs into StatementData DTOs with formatting,
+     *       calculations, and PCI-DSS compliant masking.</li>
      *   <li><b>StatementWriter:</b> Autowired @Component implementing ItemWriter interface.
      *       Generates HTML via Thymeleaf, converts to PDF via iText, writes to PersistentVolume,
      *       and optionally uploads to S3 bucket.</li>
@@ -447,15 +449,16 @@ public class StatementGenerationJobConfig {
      *   <li><b>entityManagerFactory:</b> Autowired from DataSourceConfig for JPA operations</li>
      * </ul>
      * 
-     * <p><b>Reader Configuration:</b> The TransactionReader.dateRangeTransactionReader() method
+     * <p><b>Reader Configuration:</b> The TransactionReader.accountTransactionGroupReader() method
      * is invoked with JobParameters (startDate, endDate) and EntityManagerFactory. The returned
-     * JpaPagingItemReader is configured with JPQL query:</p>
+     * ItemReader groups transactions by account, executing queries:</p>
      * <pre>
-     * SELECT t FROM Transaction t 
-     *   JOIN FETCH t.account a 
-     *   JOIN FETCH a.customer c
-     * WHERE t.processingTimestamp BETWEEN :startDate AND :endDate
-     * ORDER BY a.accountId ASC, t.processingTimestamp ASC, t.transactionId ASC
+     * 1. SELECT DISTINCT t.account.accountId FROM Transaction t 
+     *    WHERE t.processingTimestamp BETWEEN :startDate AND :endDate
+     * 2. For each account:
+     *    SELECT a FROM Account a JOIN FETCH a.customer c WHERE a.accountId = :accountId
+     * 3. SELECT t FROM Transaction t WHERE t.account.accountId = :accountId
+     *    AND t.processingTimestamp BETWEEN :startDate AND :endDate
      * </pre>
      * 
      * <p><b>Pagination Strategy:</b></p>
@@ -528,18 +531,19 @@ public class StatementGenerationJobConfig {
         log.info("Configuring statementGenerationStep with chunk size 100 for monthly statement processing");
         log.info("Statement period: {} to {}", startDate, endDate);
         
-        // Obtain configured JpaPagingItemReader from TransactionReader configuration
+        // Obtain configured AccountTransactionGroupReader from TransactionReader configuration
         // The reader is @StepScope so it receives JobParameters (startDate, endDate) at runtime
-        JpaPagingItemReader<Transaction> reader = transactionReader.dateRangeTransactionReader(
+        // This reader groups transactions by account, matching COBOL CBSTM03A.CBL processing pattern
+        var reader = transactionReader.accountTransactionGroupReader(
                 startDate, 
                 endDate, 
                 entityManagerFactory
         );
         
         return new StepBuilder("statementGenerationStep", jobRepository)
-                .<Transaction, Object>chunk(100, transactionManager)  // 100 accounts per transaction commit
-                .reader(reader)                                        // JPA reader with date range filtering
-                .processor(statementProcessor)                        // Statement formatting and masking
+                .<AccountTransactionGroup, StatementData>chunk(100, transactionManager)  // 100 accounts per transaction commit
+                .reader(reader)                                        // Account-grouped reader with date range filtering
+                .processor(statementProcessor)                        // Statement formatting and masking (AccountTransactionGroup → StatementData)
                 .writer(statementWriter)                              // HTML/PDF generation and file output
                 .build();
     }
