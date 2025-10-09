@@ -186,7 +186,7 @@ public interface TransactionMapper {
      * @see #afterMappingToResponse for post-processing hook that sets cardNumberMasked
      */
     @Mapping(target = "accountId", source = "account.accountId")
-    @Mapping(target = "cardNumberMasked", ignore = true)  // Set in @AfterMapping hook
+    @Mapping(target = "cardNumberMasked", expression = "java(transaction.getCardNumberMasked())")
     @Mapping(target = "transactionTypeDescription", ignore = true)  // Set by service layer if needed
     @Mapping(target = "transactionCategoryDescription", ignore = true)  // Set by service layer if needed
     TransactionResponse toResponse(Transaction transaction);
@@ -303,6 +303,9 @@ public interface TransactionMapper {
     @Mapping(target = "merchantName", source = "merchantName", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     @Mapping(target = "merchantCity", source = "merchantCity", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     @Mapping(target = "merchantZip", source = "merchantZip", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    @Mapping(target = "createdAt", ignore = true)  // Auto-managed by JPA @CreatedDate
+    @Mapping(target = "updatedAt", ignore = true)  // Auto-managed by JPA @LastModifiedDate
+    @Mapping(target = "version", ignore = true)  // Auto-managed by JPA @Version for optimistic locking
     Transaction toEntity(TransactionRequest request);
 
     /**
