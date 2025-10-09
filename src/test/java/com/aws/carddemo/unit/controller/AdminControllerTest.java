@@ -17,6 +17,8 @@
 
 package com.aws.carddemo.unit.controller;
 
+import com.aws.carddemo.config.BatchConfig;
+import com.aws.carddemo.config.DataSourceConfig;
 import com.aws.carddemo.controller.AdminController;
 import com.aws.carddemo.dto.request.UserCreateRequest;
 import com.aws.carddemo.dto.request.UserUpdateRequest;
@@ -27,8 +29,14 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.batch.BatchAutoConfiguration;
+import org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
+import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.FilterType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -116,7 +124,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @see UserResponse
  * @since 1.0.0
  */
-@WebMvcTest(AdminController.class)
+@WebMvcTest(
+    controllers = AdminController.class,
+    excludeAutoConfiguration = {
+        DataSourceAutoConfiguration.class,
+        HibernateJpaAutoConfiguration.class,
+        FlywayAutoConfiguration.class,
+        BatchAutoConfiguration.class
+    },
+    excludeFilters = @ComponentScan.Filter(
+        type = FilterType.ASSIGNABLE_TYPE,
+        classes = {BatchConfig.class, DataSourceConfig.class}
+    ))
 @DisplayName("AdminController Unit Tests")
 public class AdminControllerTest {
 
