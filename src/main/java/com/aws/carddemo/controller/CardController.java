@@ -2,6 +2,8 @@ package com.aws.carddemo.controller;
 
 import com.aws.carddemo.dto.request.CardUpdateRequest;
 import com.aws.carddemo.dto.response.CardResponse;
+import com.aws.carddemo.mapper.CardMapper;
+import com.aws.carddemo.model.Card;
 import com.aws.carddemo.service.CardService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +47,7 @@ import org.springframework.web.bind.annotation.*;
 public class CardController {
 
     private final CardService cardService;
+    private final CardMapper cardMapper;
 
     /**
      * Retrieve paginated list of cards for a specific account.
@@ -99,7 +102,11 @@ public class CardController {
         try {
             // Delegate to service layer for business logic
             // Service handles XREFFILE cross-reference lookup and pagination
-            Page<CardResponse> cards = cardService.getCardsByAccountId(accountId, pageable);
+            Page<Card> cardEntities = cardService.getCardsByAccountId(accountId, pageable);
+            
+            // Convert Card entities to CardResponse DTOs using CardMapper
+            // Page.map() applies the mapper to each element while preserving pagination metadata
+            Page<CardResponse> cards = cardEntities.map(cardMapper::toResponse);
             
             log.info("Successfully retrieved {} card(s) for account ID: {}, page: {}/{}", 
                     cards.getNumberOfElements(), 
@@ -169,13 +176,13 @@ public class CardController {
         }
         
         try {
-            // First retrieve basic card info to verify existence
-            // This calls getCardByCardNumber for basic lookup
-            CardResponse basicCard = cardService.getCardByCardNumber(cardNumber);
-            
-            // Then retrieve enriched card info with account details via XREFFILE lookup
+            // Retrieve enriched card info with account details via XREFFILE lookup
             // This provides full card and account information for display
-            CardResponse enrichedCard = cardService.getCardWithAccountInfo(cardNumber);
+            Card cardEntity = cardService.getCardWithAccountInfo(cardNumber);
+            
+            // Convert Card entity to CardResponse DTO using CardMapper
+            // This applies PCI-DSS compliant card number masking (shows only last 4 digits)
+            CardResponse enrichedCard = cardMapper.toResponse(cardEntity);
             
             log.info("Successfully retrieved card details for card number: {}", maskedCardNumber);
             
@@ -233,33 +240,42 @@ public class CardController {
             @PathVariable("id") Long id,
             @Valid @RequestBody CardUpdateRequest request) {
         
-        log.info("Updating card ID: {} with request: embossedName={}, expirationDate={}, activeStatus={}", 
+        log.info("Updating card ID: {} with request: cardholderName={}, expirationMonth={}, expirationYear={}, cardStatus={}", 
                 id, 
-                request.getEmbossedName(), 
-                request.getExpirationDate(), 
-                request.getActiveStatus());
+                request.getCardholderName(), 
+                request.getExpirationMonth(), 
+                request.getExpirationYear(),
+                request.getCardStatus());
         
         try {
             // First retrieve the card to get card number for logging and validation
             // This ensures the card exists before attempting update (COBOL READ before REWRITE pattern)
-            CardResponse existingCard = cardService.getCardById(id);
-            String maskedCardNumber = maskCardNumber(existingCard.getCardNumber());
+            Card existingCard = cardService.getCardById(id);
+            
+            // Convert to response DTO to get masked card number for logging
+            CardResponse existingCardResponse = cardMapper.toResponse(existingCard);
+            String maskedCardNumber = existingCardResponse.getCardNumberMasked();
             
             log.debug("Current card state - ID: {}, card number: {}, status: {}", 
-                    id, maskedCardNumber, existingCard.getActiveStatus());
+                    id, maskedCardNumber, existingCardResponse.getActiveStatus());
             
             // Update card status using dedicated service method
-            // This handles the activeStatus field update (maps to COBOL CARD-ACTIVE-STATUS)
-            // Status validation (Y/N) is enforced by CardUpdateRequest bean validation
-            CardResponse updatedCard = cardService.updateCardStatus(id, request.getActiveStatus());
+            // This handles the cardStatus field update (maps to COBOL CARD-ACTIVE-STATUS)
+            // Status validation (A/C/S) is enforced by CardUpdateRequest bean validation
+            // Note: In the current implementation, updateCardStatus takes activeStatus (Y/N format)
+            // We need to map cardStatus (A/C/S) to activeStatus for service layer compatibility
+            String activeStatus = mapCardStatusToActiveStatus(request.getCardStatus());
+            Card updatedCardEntity = cardService.updateCardStatus(id, activeStatus);
             
-            // Note: embossedName and expirationDate updates are handled by the service layer
-            // through the updateCardStatus method which performs a full card update
-            // The method name reflects the primary business operation (status change)
-            // but includes all field updates per COCRDUPC.cbl REWRITE logic
+            // Convert updated Card entity to CardResponse DTO
+            CardResponse updatedCard = cardMapper.toResponse(updatedCardEntity);
+            
+            // Note: cardholderName and expirationDate updates would need additional service methods
+            // The current updateCardStatus method focuses on status changes per COCRDUPC.cbl REWRITE logic
+            // Full field updates can be implemented via a comprehensive updateCard service method
             
             log.info("Successfully updated card ID: {}, card number: {}, new status: {}", 
-                    id, maskedCardNumber, request.getActiveStatus());
+                    id, maskedCardNumber, request.getCardStatus());
             
             return ResponseEntity.ok(updatedCard);
             
@@ -288,9 +304,14 @@ public class CardController {
         log.info("Retrieving card by ID: {}", id);
         
         try {
-            CardResponse card = cardService.getCardById(id);
+            // Retrieve Card entity from service layer
+            Card cardEntity = cardService.getCardById(id);
             
-            String maskedCardNumber = maskCardNumber(card.getCardNumber());
+            // Convert Card entity to CardResponse DTO using CardMapper
+            CardResponse card = cardMapper.toResponse(cardEntity);
+            
+            // Use masked card number from DTO for logging (PCI-DSS compliance)
+            String maskedCardNumber = card.getCardNumberMasked();
             log.info("Successfully retrieved card ID: {}, card number: {}", id, maskedCardNumber);
             
             return ResponseEntity.ok(card);
@@ -321,5 +342,33 @@ public class CardController {
         // Show only last 4 digits per PCI-DSS 3.3
         String lastFour = cardNumber.substring(cardNumber.length() - 4);
         return "************" + lastFour;
+    }
+    
+    /**
+     * Map CardUpdateRequest cardStatus codes to service layer activeStatus format.
+     * 
+     * CardUpdateRequest uses card status codes:
+     * - 'A' = Active (card can be used for transactions)
+     * - 'C' = Closed (card permanently closed)
+     * - 'S' = Suspended (card temporarily suspended)
+     * 
+     * Service layer expects activeStatus format:
+     * - 'Y' = Active (maps to 'A')
+     * - 'N' = Inactive (maps to 'C' or 'S')
+     * 
+     * This mapping maintains compatibility with the legacy COBOL field format
+     * (CARD-ACTIVE-STATUS PIC X(01) with Y/N values) while supporting the
+     * enhanced status codes in the REST API.
+     * 
+     * @param cardStatus the card status code from CardUpdateRequest (A/C/S)
+     * @return activeStatus format for service layer (Y/N)
+     */
+    private String mapCardStatusToActiveStatus(String cardStatus) {
+        if (cardStatus == null) {
+            return "N";
+        }
+        
+        // Map 'A' (Active) to 'Y', all others to 'N'
+        return cardStatus.equals("A") ? "Y" : "N";
     }
 }
