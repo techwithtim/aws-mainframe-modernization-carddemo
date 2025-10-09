@@ -114,12 +114,11 @@ spring:
     rollback-on-commit-failure: true
 
   # Spring Security configuration for tests
-  security:
-    user:
-      # Default test user credentials
-      name: testuser
-      password: testpass
-      roles: USER,ADMIN
+  # NOTE: spring.security.user properties REMOVED to prevent auto-configuration
+  # from creating a default SecurityFilterChain that conflicts with our custom
+  # SecurityConfig bean. Tests should use the application's SecurityConfig which
+  # includes JwtAuthenticationFilter and proper permitAll() rules for public endpoints.
+  # Test users are seeded in @BeforeEach methods with UserRepository for integration tests.
 
 # Server configuration for test context
 server:

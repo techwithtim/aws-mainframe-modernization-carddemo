@@ -137,6 +137,7 @@ public abstract class PostgresTestContainer {
      *   <li>{@code spring.datasource.url} - JDBC URL with dynamic port (e.g., jdbc:postgresql://localhost:32768/carddemo_test)</li>
      *   <li>{@code spring.datasource.username} - Database username (test_user)</li>
      *   <li>{@code spring.datasource.password} - Database password (test_password)</li>
+     *   <li>{@code spring.datasource.driver-class-name} - PostgreSQL driver (org.postgresql.Driver)</li>
      * </ul>
      * 
      * <p><strong>Lazy Property Evaluation:</strong></p>
@@ -171,6 +172,7 @@ public abstract class PostgresTestContainer {
         registry.add("spring.datasource.url", postgreSQLContainer::getJdbcUrl);
         registry.add("spring.datasource.username", postgreSQLContainer::getUsername);
         registry.add("spring.datasource.password", postgreSQLContainer::getPassword);
+        registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
     }
 
     /**

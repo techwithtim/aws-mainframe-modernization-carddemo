@@ -28,14 +28,16 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -125,16 +127,56 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * <p>Tests verify that plain-text passwords are never logged or stored, and that
  * BCrypt hashing is correctly applied per Agent Action Plan Section 0.8.1 Critical Directive 3</p>
  * 
+ * <p><strong>Testcontainers Configuration:</strong></p>
+ * <p>This class extends {@link PostgresTestContainer} which is already annotated with
+ * {@code @Testcontainers} at line 81. Adding {@code @Testcontainers} to this child class
+ * would be <strong>redundant and cause Spring test context initialization issues</strong>,
+ * particularly preventing the {@code @Import(SecurityConfig.class)} annotation from being
+ * processed correctly. The Testcontainers documentation specifies that {@code @Testcontainers}
+ * should only be present on the class that declares {@code @Container} fields.</p>
+ * 
+ * <p>The {@code @AutoConfigureTestDatabase(replace = Replace.NONE)} annotation is critical
+ * for Testcontainers integration. Without it, Spring Boot would auto-configure an H2
+ * in-memory database (because H2 is on the classpath), ignoring the Testcontainers
+ * PostgreSQL instance. This annotation ensures that the {@code @DynamicPropertySource}
+ * configuration in {@link PostgresTestContainer} is respected and used.</p>
+ * 
+ * <p>The {@code @ActiveProfiles("test")} annotation is equally critical to load the
+ * {@code application-test.yml} configuration file, which specifies the PostgreSQL driver
+ * and other test-specific settings. Without this annotation, Spring Boot uses the default
+ * profile configuration, which may result in H2 driver conflicts.</p>
+ * 
+ * <p><strong>CRITICAL FIX - Removed @Import(SecurityConfig.class):</strong></p>
+ * <p>The {@code @Import(SecurityConfig.class)} annotation was <strong>causing SecurityConfig
+ * to be loaded twice</strong>, which interfered with the {@code FilterRegistrationBean} that
+ * prevents double-registration of {@code JwtAuthenticationFilter}. Spring Boot's component
+ * scanning via {@code @SpringBootTest} already discovers and loads {@code SecurityConfig} from
+ * the {@code com.aws.carddemo.config} package. Explicitly importing it caused bean conflicts
+ * and resulted in the filter being registered with the servlet container (bypassing
+ * {@code shouldNotFilter()}), leading to 401 errors on public endpoints.</p>
+ * 
+ * <p><strong>Why This Fix Works:</strong></p>
+ * <ul>
+ *   <li>{@code @SpringBootTest} automatically scans {@code com.aws.carddemo} package</li>
+ *   <li>{@code SecurityConfig} is discovered once via component scanning</li>
+ *   <li>{@code FilterRegistrationBean} successfully prevents servlet container registration</li>
+ *   <li>{@code JwtAuthenticationFilter} is only added to Spring Security chain</li>
+ *   <li>{@code shouldNotFilter()} is properly invoked for public endpoints</li>
+ *   <li>{@code /api/v1/auth/**} endpoints bypass JWT validation as intended</li>
+ * </ul>
+ * 
  * @author CardDemo Modernization Team
  * @version 1.0.0
  * @see com.aws.carddemo.controller.AuthController
  * @see com.aws.carddemo.service.AuthenticationService
  * @see com.aws.carddemo.security.JwtTokenProvider
+ * @see PostgresTestContainer
  * @since 1.0.0
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-@Testcontainers
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@ActiveProfiles("test")
 public class AuthenticationIntegrationTest extends PostgresTestContainer {
 
     @Autowired
@@ -154,7 +196,7 @@ public class AuthenticationIntegrationTest extends PostgresTestContainer {
 
     private User testUser;
     private final String testUsername = "testuser";
-    private final String testPassword = "password123";
+    private final String testPassword = "pass1234"; // 8 characters (matches @Size(max=8) validation)
     private final String testFirstName = "Test";
     private final String testLastName = "User";
     private final String testUserType = "R"; // Regular user (ROLE_USER)
@@ -172,7 +214,7 @@ public class AuthenticationIntegrationTest extends PostgresTestContainer {
      * SEC-USR-ID:     'testuser' (PIC X(08))
      * SEC-USR-FNAME:  'Test'     (PIC X(20))
      * SEC-USR-LNAME:  'User'     (PIC X(20))
-     * SEC-USR-PWD:    'password123' (PIC X(08) - plain-text!)
+     * SEC-USR-PWD:    'pass1234' (PIC X(08) - plain-text, 8 chars max)
      * SEC-USR-TYPE:   'R'        (PIC X(01) - Regular user)
      * </pre>
      * 
@@ -182,6 +224,20 @@ public class AuthenticationIntegrationTest extends PostgresTestContainer {
      *   <li>Account status: Not locked (accountLocked=false)</li>
      *   <li>Failed attempts: Zero (failedLoginAttempts=0)</li>
      *   <li>Last login: null (will be set on successful authentication)</li>
+     * </ul>
+     * 
+     * <p><strong>Data Persistence Strategy:</strong> This setup method uses 
+     * {@code saveAndFlush()} which immediately persists data to the database and commits
+     * the transaction, making it visible to subsequent MockMvc HTTP requests that run
+     * in separate transactions.</p>
+     * 
+     * <p><strong>Why saveAndFlush() is Required:</strong></p>
+     * <ul>
+     *   <li>MockMvc HTTP requests create separate transactions from test setup</li>
+     *   <li>Spring Test's @Transactional on @BeforeEach doesn't provide EntityManager context</li>
+     *   <li>saveAndFlush() immediately commits data to database (no rollback)</li>
+     *   <li>This ensures test data is visible across transaction boundaries</li>
+     *   <li>Essential for integration tests with real database and HTTP layer</li>
      * </ul>
      */
     @BeforeEach
@@ -201,7 +257,8 @@ public class AuthenticationIntegrationTest extends PostgresTestContainer {
                 .failedLoginAttempts(0)
                 .build();
 
-        userRepository.save(testUser);
+        // saveAndFlush() immediately commits to database, making data visible to HTTP requests
+        testUser = userRepository.saveAndFlush(testUser);
     }
 
     /**
@@ -309,8 +366,9 @@ public class AuthenticationIntegrationTest extends PostgresTestContainer {
                 "Username extracted from token must match login username");
 
         // Verify roles can be extracted from token
-        List<String> extractedRoles = jwtTokenProvider.getRolesFromToken(loginResponse.getAccessToken());
-        assertTrue(extractedRoles.contains("ROLE_USER"),
+        List<GrantedAuthority> extractedRoles = jwtTokenProvider.getRolesFromToken(loginResponse.getAccessToken());
+        assertTrue(extractedRoles.stream()
+                        .anyMatch(auth -> "ROLE_USER".equals(auth.getAuthority())),
                 "Roles extracted from token must contain ROLE_USER");
     }
 
@@ -338,9 +396,9 @@ public class AuthenticationIntegrationTest extends PostgresTestContainer {
      */
     @Test
     void testLoginWithInvalidUsername() throws Exception {
-        // Arrange: Create login request with non-existent username
+        // Arrange: Create login request with non-existent username (≤8 chars per validation rules)
         LoginRequest loginRequest = LoginRequest.builder()
-                .username("nonexistent")
+                .username("baduser")  // Changed from "nonexistent" to satisfy @Size(max=8)
                 .password(testPassword)
                 .build();
 
@@ -394,10 +452,10 @@ public class AuthenticationIntegrationTest extends PostgresTestContainer {
      */
     @Test
     void testLoginWithInvalidPassword() throws Exception {
-        // Arrange: Create login request with correct username but wrong password
+        // Arrange: Create login request with correct username but wrong password (≤8 chars per validation rules)
         LoginRequest loginRequest = LoginRequest.builder()
                 .username(testUsername)
-                .password("wrongpassword")
+                .password("badpass1")  // Changed from "wrongpassword" to satisfy @Size(max=8)
                 .build();
 
         // Act & Assert: Perform POST /api/v1/auth/login expecting HTTP 401
@@ -499,10 +557,14 @@ public class AuthenticationIntegrationTest extends PostgresTestContainer {
      * <p><strong>Test Flow:</strong></p>
      * <ol>
      *   <li>Login successfully and obtain JWT token</li>
-     *   <li>Call protected endpoint GET /api/v1/accounts/1 with Authorization: Bearer {token}</li>
+     *   <li>Call protected endpoint GET /api/v1/menu with Authorization: Bearer {token}</li>
      *   <li>Assert HTTP 200 OK status (endpoint access granted)</li>
      *   <li>Verify SecurityContext is populated with authenticated user</li>
      * </ol>
+     * 
+     * <p><strong>Note:</strong> Using /api/v1/menu endpoint for authentication testing as it's
+     * a protected resource that requires USER or ADMIN role. This validates that JWT authentication
+     * works correctly for protected endpoints.</p>
      *
      * @throws Exception if MockMvc request execution fails
      */
@@ -525,11 +587,12 @@ public class AuthenticationIntegrationTest extends PostgresTestContainer {
         String jwtToken = loginResponse.getAccessToken();
 
         // Act & Assert: Call protected endpoint with valid JWT token
-        mockMvc.perform(get("/api/v1/accounts/1")
+        // Using /api/v1/menu as a protected endpoint to validate JWT authentication
+        mockMvc.perform(get("/api/v1/menu")
                         .header("Authorization", "Bearer " + jwtToken))
                 .andExpect(status().isOk());
-                // Note: Actual account endpoint may return 404 if account doesn't exist,
-                // but the important part is that authentication succeeds (not 401)
+                // Note: The important validation is that authentication succeeds (not 401)
+                // The menu endpoint is protected and requires a valid JWT token
     }
 
     /**
@@ -541,17 +604,21 @@ public class AuthenticationIntegrationTest extends PostgresTestContainer {
      * 
      * <p><strong>Test Flow:</strong></p>
      * <ol>
-     *   <li>Call protected endpoint GET /api/v1/accounts/1 WITHOUT Authorization header</li>
+     *   <li>Call protected endpoint GET /api/v1/menu WITHOUT Authorization header</li>
      *   <li>Assert HTTP 401 Unauthorized status</li>
      *   <li>Verify access is denied due to missing authentication</li>
      * </ol>
+     * 
+     * <p><strong>Note:</strong> Using /api/v1/menu endpoint which requires authentication
+     * (USER or ADMIN role) to validate that Spring Security properly rejects unauthenticated requests.</p>
      *
      * @throws Exception if MockMvc request execution fails
      */
     @Test
     void testAuthenticatedEndpointAccessWithoutToken() throws Exception {
         // Act & Assert: Call protected endpoint without JWT token
-        mockMvc.perform(get("/api/v1/accounts/1"))
+        // Using /api/v1/menu as a protected endpoint to validate authentication requirement
+        mockMvc.perform(get("/api/v1/menu"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -662,8 +729,8 @@ public class AuthenticationIntegrationTest extends PostgresTestContainer {
         assertTrue(passwordEncoder.matches(testPassword, user.getPasswordHash()),
                 "BCrypt must correctly verify original password against hash");
 
-        // Verify wrong password does not match
-        assertFalse(passwordEncoder.matches("wrongpassword", user.getPasswordHash()),
+        // Verify wrong password does not match (≤8 chars per validation rules)
+        assertFalse(passwordEncoder.matches("badpass1", user.getPasswordHash()),
                 "BCrypt must reject wrong password");
     }
 
@@ -687,10 +754,10 @@ public class AuthenticationIntegrationTest extends PostgresTestContainer {
      */
     @Test
     void testAccountLockoutAfterFailedAttempts() throws Exception {
-        // Arrange: Create login request with wrong password
+        // Arrange: Create login request with wrong password (≤8 chars per validation rules)
         LoginRequest loginRequest = LoginRequest.builder()
                 .username(testUsername)
-                .password("wrongpassword")
+                .password("badpass1")  // Changed from "wrongpassword" to satisfy @Size(max=8)
                 .build();
 
         // Act: Attempt login 5 times with wrong password

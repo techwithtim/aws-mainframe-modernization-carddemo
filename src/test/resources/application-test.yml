@@ -132,11 +132,18 @@ spring:
   # Security Configuration - Relaxed for Tests
   # ============================================================================
   security:
-    # JWT token settings for test authentication
-    jwt:
-      secret: test-secret-key-for-jwt-token-generation-min-256-bits-required
-      expiration: 3600000             # 1 hour (longer for debugging)
-      refresh-expiration: 86400000    # 24 hours
+    # Note: JWT configuration moved to top-level jwt block (below)
+    # to match @Value("${jwt.secret}") in JwtTokenProvider.java
+
+# ============================================================================
+# JWT Configuration - Test Environment
+# ============================================================================
+# Base64-encoded HMAC secret for HS256 signing (256 bits / 32 bytes minimum)
+# Generated using: python3 -c "import base64,secrets; print(base64.b64encode(secrets.token_bytes(32)).decode())"
+jwt:
+  secret: rkWfQKmIAx7gw/olCzn1Qnmoho5RNJzMBl67JOpoJ+8=  # Base64-encoded 256-bit key
+  expiration: 3600000                 # 1 hour in milliseconds
+  algorithm: HS256                    # Symmetric HMAC-SHA256 signing
 
 # ============================================================================
 # Server Configuration

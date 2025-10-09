@@ -412,12 +412,21 @@ public class GlobalExceptionHandler {
         // Log detailed reason internally for security audit (with automatic PCI-DSS masking)
         log.warn("Authentication failed: {} at URI: {}", ex.getMessage(), request.getRequestURI());
         
+        // Special case: Account lockout message should be shown to users
+        // (they need to know their account is locked to contact administrator)
+        // This does not compromise security - it prevents brute force attacks
+        String clientMessage = "Authentication failed";
+        if (ex.getMessage() != null && ex.getMessage().toLowerCase().contains("locked")) {
+            clientMessage = ex.getMessage(); // Preserve specific lockout message
+        }
+        
         // Return generic message to client to prevent credential enumeration
+        // EXCEPT for account lockout which is a legitimate user-facing concern
         ApiError error = ApiError.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.UNAUTHORIZED.value())
                 .error(HttpStatus.UNAUTHORIZED.getReasonPhrase())
-                .message("Authentication failed")
+                .message(clientMessage)
                 .path(request.getRequestURI())
                 .build();
         

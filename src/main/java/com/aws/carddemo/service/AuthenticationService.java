@@ -191,7 +191,7 @@ public class AuthenticationService {
      * @throws ResourceNotFoundException if user lookup fails due to database connectivity issues
      *         (wrapped and re-thrown as AuthenticationFailedException for consistent error handling)
      */
-    @Transactional
+    @Transactional(noRollbackFor = AuthenticationFailedException.class)
     public LoginResponse authenticate(LoginRequest loginRequest) {
         // Extract credentials from request
         String username = loginRequest.getUsername();

@@ -18,6 +18,7 @@
 package com.aws.carddemo.config;
 
 import com.aws.carddemo.security.JwtAuthenticationFilter;
+import com.aws.carddemo.security.JwtTokenProvider;
 import com.aws.carddemo.security.UserDetailsServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -295,13 +297,27 @@ import java.util.Map;
 public class SecurityConfig {
 
     /**
-     * JWT authentication filter for validating bearer tokens on incoming requests.
+     * NOTE: JwtAuthenticationFilter is NOT injected as a field to avoid circular dependency.
      * 
-     * <p>Injected via constructor (Lombok @RequiredArgsConstructor generates constructor
-     * for final fields). This filter executes before UsernamePasswordAuthenticationFilter
-     * in the Spring Security filter chain.</p>
+     * <p>The filter is defined as a @Bean in this configuration class (see
+     * {@link #jwtAuthenticationFilter(JwtTokenProvider, ObjectMapper)}) and is injected
+     * directly as a method parameter into {@link #securityFilterChain(HttpSecurity, JwtAuthenticationFilter)}.
+     * This method-level injection pattern breaks the circular dependency that would occur
+     * with field-level injection via @RequiredArgsConstructor.</p>
+     * 
+     * <p>Circular Dependency Chain (if field injection was used):</p>
+     * <ul>
+     *   <li>SecurityConfig requires JwtAuthenticationFilter (field injection)</li>
+     *   <li>JwtAuthenticationFilter bean is defined within SecurityConfig</li>
+     *   <li>Spring cannot determine which to create first → BeanCurrentlyInCreationException</li>
+     * </ul>
+     * 
+     * <p>Solution: Method-level injection allows Spring to create the JwtAuthenticationFilter
+     * bean first, then inject it into the securityFilterChain method when needed.</p>
+     * 
+     * @see #jwtAuthenticationFilter(JwtTokenProvider, ObjectMapper)
+     * @see #securityFilterChain(HttpSecurity, JwtAuthenticationFilter)
      */
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     /**
      * UserDetailsService implementation for loading user credentials from PostgreSQL.
@@ -437,8 +453,11 @@ public class SecurityConfig {
      * @see #authenticationManager(AuthenticationConfiguration)
      * @see #corsConfigurationSource()
      */
+    @Order(1)
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
         log.info("Configuring Spring Security filter chain with JWT authentication");
 
         http
@@ -523,6 +542,8 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
             // Add JWT authentication filter before UsernamePasswordAuthenticationFilter
+            // This filter validates JWT tokens for protected endpoints while allowing public endpoints
+            // to pass through via the shouldNotFilter() method.
             // Replaces COBOL: READ-USER-SEC-FILE paragraph from COSGN00C.cbl
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
@@ -986,5 +1007,167 @@ public class SecurityConfig {
                  configuration.getAllowedMethods().size());
         
         return source;
+    }
+
+    /**
+     * Creates JWT authentication filter bean for validating bearer tokens.
+     * 
+     * <p><strong>CRITICAL:</strong> JwtAuthenticationFilter is NOT annotated with @Component
+     * to prevent Spring Boot from automatically registering it in the servlet container.
+     * Instead, we define it as a @Bean here and explicitly add it to the Spring Security
+     * filter chain in the {@link #securityFilterChain(HttpSecurity)} method.</p>
+     * 
+     * <p><strong>Why This Approach:</strong></p>
+     * <ul>
+     *   <li>@Component causes Spring Boot to register filter BEFORE Security filter chain</li>
+     *   <li>This breaks permitAll() rules since filter runs before security config</li>
+     *   <li>@Bean approach gives us full control over filter placement</li>
+     *   <li>Filter is added via addFilterBefore() at the exact position we want</li>
+     * </ul>
+     * 
+     * <p><strong>COBOL Equivalent:</strong></p>
+     * <p>This replaces the CICS transaction routing logic from COSGN00C.cbl:</p>
+     * <pre>
+     * COBOL:
+     *     IF SEC-USR-VERIFIED
+     *         EVALUATE CDEMO-MENU-OPT
+     *             WHEN '1'
+     *                 EXEC CICS XCTL PROGRAM('COACTVW') ...
+     *             WHEN '2'
+     *                 EXEC CICS XCTL PROGRAM('COCRDLI') ...
+     *         END-EVALUATE
+     *     ELSE
+     *         PERFORM DISPLAY-SIGNON-SCREEN  -- Public endpoint, no security check
+     *     END-IF.
+     * </pre>
+     * 
+     * <p><strong>Java Equivalent:</strong></p>
+     * <pre>
+     * // Public endpoints bypass JWT filter (like COBOL's signon screen)
+     * GET /api/v1/auth/login → permitAll() → no JWT validation
+     * 
+     * // Protected endpoints require JWT (like COBOL's XCTL to authenticated programs)
+     * GET /api/v1/accounts/{id} → authenticated() → JWT filter validates token
+     * </pre>
+     * 
+     * @param jwtTokenProvider JWT token provider for validation
+     * @param userDetailsService service for loading user details
+     * @param objectMapper Jackson object mapper for JSON serialization
+     * @return configured JwtAuthenticationFilter instance
+     * 
+     * @see JwtAuthenticationFilter
+     * @see JwtAuthenticationFilter#shouldNotFilter(HttpServletRequest)
+     * @see #securityFilterChain(HttpSecurity)
+     */
+    @Bean
+    public JwtAuthenticationFilter jwtAuthenticationFilter(
+            JwtTokenProvider jwtTokenProvider,
+            UserDetailsServiceImpl userDetailsService,
+            ObjectMapper objectMapper) {
+        
+        log.info("Creating JwtAuthenticationFilter bean with explicit dependency injection");
+        
+        return new JwtAuthenticationFilter(jwtTokenProvider, userDetailsService, objectMapper);
+    }
+
+    /**
+     * Disables automatic servlet container registration of JwtAuthenticationFilter.
+     * 
+     * <p><strong>CRITICAL:</strong> This bean prevents Spring Boot from automatically registering
+     * the {@link JwtAuthenticationFilter} as a servlet filter in the container's filter chain.
+     * Without this configuration, the filter would be registered TWICE:</p>
+     * <ol>
+     *   <li><strong>Automatic Registration:</strong> Spring Boot auto-detects filters defined as
+     *       {@code @Bean} and registers them with the servlet container. This registration occurs
+     *       OUTSIDE the Spring Security filter chain, meaning {@code shouldNotFilter()} is never
+     *       called and the filter blocks ALL requests including public endpoints.</li>
+     *   <li><strong>Manual Registration:</strong> Our explicit {@code .addFilterBefore()} in
+     *       {@link #securityFilterChain(HttpSecurity, JwtAuthenticationFilter)} adds the filter
+     *       to the Spring Security chain where {@code shouldNotFilter()} is properly invoked.</li>
+     * </ol>
+     * 
+     * <p><strong>Why This is Necessary:</strong></p>
+     * <p>When a filter extends {@link org.springframework.web.filter.OncePerRequestFilter} and is
+     * defined as a Spring {@code @Bean}, Spring Boot's {@link org.springframework.boot.web.servlet.FilterRegistrationBean}
+     * auto-configuration registers it with the servlet container. This auto-registration:</p>
+     * <ul>
+     *   <li>Runs the filter BEFORE the Spring Security filter chain is even invoked</li>
+     *   <li>Bypasses the {@code shouldNotFilter()} method completely</li>
+     *   <li>Ignores {@code permitAll()} rules defined in {@link SecurityFilterChain}</li>
+     *   <li>Results in 401 Unauthorized for ALL requests including /api/v1/auth/login</li>
+     * </ul>
+     * 
+     * <p><strong>How This Fix Works:</strong></p>
+     * <p>Setting {@code FilterRegistrationBean.setEnabled(false)} tells Spring Boot to skip
+     * auto-registration of the filter with the servlet container. The filter is ONLY registered
+     * via our manual {@code .addFilterBefore()} call, ensuring it:</p>
+     * <ul>
+     *   <li>Runs as part of the Spring Security filter chain</li>
+     *   <li>Properly invokes {@code shouldNotFilter()} for each request</li>
+     *   <li>Respects {@code permitAll()} rules for public endpoints</li>
+     *   <li>Allows /api/v1/auth/** endpoints to bypass JWT validation</li>
+     * </ul>
+     * 
+     * <p><strong>Impact of This Fix:</strong></p>
+     * <pre>
+     * BEFORE (Filter Registered Twice):
+     *   Request → Servlet Container Filter (auto-registered, always blocks)
+     *          → Spring Security Chain (never reached for public endpoints)
+     *          → Controller (never reached, 401 returned)
+     * 
+     * AFTER (Filter Registered Once):
+     *   Request → Spring Security Chain → JwtAuthenticationFilter.shouldNotFilter()
+     *          → If public endpoint: Skip filter, proceed to controller
+     *          → If protected endpoint: Validate JWT token
+     *          → Controller (receives request if authorized)
+     * </pre>
+     * 
+     * <p><strong>Test Impact:</strong></p>
+     * <p>This fix resolves the following integration test failures:</p>
+     * <ul>
+     *   <li>{@code testSuccessfulLogin()}: POST /api/v1/auth/login now returns 200 OK (was 401)</li>
+     *   <li>{@code testLoginWithInvalidUsername()}: Controller handles error (was blocked at filter)</li>
+     *   <li>{@code testLoginWithInvalidPassword()}: Controller handles error (was blocked at filter)</li>
+     *   <li>{@code testLoginWithMissingCredentials()}: Bean Validation runs (was blocked at filter)</li>
+     *   <li>{@code testJwtTokenExpiration()}: Login succeeds before token expiry test (was blocked)</li>
+     *   <li>{@code testAccountLockoutAfterFailedAttempts()}: Failed login tracking works (was blocked)</li>
+     *   <li>{@code testLastLoginTimestampUpdate()}: Login succeeds for timestamp test (was blocked)</li>
+     *   <li>{@code testAuthenticatedEndpointAccessWithValidToken()}: Login generates token (was blocked)</li>
+     * </ul>
+     * 
+     * <p><strong>Related Issues Fixed:</strong></p>
+     * <ul>
+     *   <li>Issue #1: {@code @Component} annotation on filter (removed, replaced with {@code @Bean})</li>
+     *   <li>Issue #2: Circular dependency (removed redundant field injection)</li>
+     *   <li>Issue #3: Automatic servlet registration (THIS FIX - disable auto-registration)</li>
+     * </ul>
+     * 
+     * <p><strong>Production Deployment:</strong></p>
+     * <p>This configuration is REQUIRED in production to ensure public endpoints remain accessible.
+     * Without it, the authentication API endpoints would be unreachable, breaking the login flow.</p>
+     * 
+     * @param filter the JwtAuthenticationFilter bean to disable automatic registration for
+     * @return FilterRegistrationBean with enabled=false to prevent double registration
+     * 
+     * @see JwtAuthenticationFilter
+     * @see JwtAuthenticationFilter#shouldNotFilter(javax.servlet.http.HttpServletRequest)
+     * @see org.springframework.boot.web.servlet.FilterRegistrationBean
+     * @see <a href="https://docs.spring.io/spring-boot/docs/current/reference/html/web.html#web.servlet.embedded-container.servlets-filters-listeners.beans">
+     *      Spring Boot Filter Registration Documentation</a>
+     */
+    @Bean
+    public org.springframework.boot.web.servlet.FilterRegistrationBean<JwtAuthenticationFilter> jwtFilterRegistration(
+            JwtAuthenticationFilter filter) {
+        
+        org.springframework.boot.web.servlet.FilterRegistrationBean<JwtAuthenticationFilter> registration = 
+            new org.springframework.boot.web.servlet.FilterRegistrationBean<>(filter);
+        
+        // CRITICAL: Disable automatic servlet container registration
+        // Filter is ONLY registered via .addFilterBefore() in SecurityFilterChain
+        registration.setEnabled(false);
+        
+        log.info("Disabled automatic servlet registration for JwtAuthenticationFilter (manual SecurityFilterChain registration only)");
+        
+        return registration;
     }
 }

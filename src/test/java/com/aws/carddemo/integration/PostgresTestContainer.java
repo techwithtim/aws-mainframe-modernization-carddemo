@@ -141,14 +141,15 @@ public abstract class PostgresTestContainer {
         registry.add("spring.datasource.url", POSTGRES_CONTAINER::getJdbcUrl);
         registry.add("spring.datasource.username", POSTGRES_CONTAINER::getUsername);
         registry.add("spring.datasource.password", POSTGRES_CONTAINER::getPassword);
+        registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
         
-        // Flyway configuration for automated schema migrations
-        registry.add("spring.flyway.enabled", () -> true);
-        registry.add("spring.flyway.clean-disabled", () -> false); // Allow clean for tests
-        registry.add("spring.flyway.locations", () -> "classpath:db/migration");
+        // Disable Flyway for integration tests to avoid circular dependency with EntityManagerFactory
+        // Integration tests use Hibernate's automatic schema creation instead
+        registry.add("spring.flyway.enabled", () -> false);
         
-        // Hibernate configuration for schema validation (not generation)
-        registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
+        // Hibernate configuration: Use create-drop to automatically create/drop schema in test database
+        // This replaces Flyway migrations for integration test scenarios
+        registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
         registry.add("spring.jpa.show-sql", () -> false); // Reduce test log noise
         
         // Connection pool sizing for test environment
