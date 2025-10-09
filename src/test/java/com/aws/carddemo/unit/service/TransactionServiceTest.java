@@ -562,7 +562,7 @@ class TransactionServiceTest {
 
         when(cardXrefRepository.findByCardNumber(cardNumber)).thenReturn(Optional.of(testCardXref));
         when(accountRepository.findByIdWithLock(1L)).thenReturn(Optional.of(testAccount));
-        doThrow(new InsufficientFundsException("Transaction amount exceeds available credit"))
+        doThrow(new InsufficientFundsException(largeAmount, testAccount.getCurrentBalance(), testAccount.getCreditLimit()))
                 .when(accountService).validateCreditLimit(testAccount, largeAmount);
 
         // Act & Assert: Verify exception thrown for credit limit violation
