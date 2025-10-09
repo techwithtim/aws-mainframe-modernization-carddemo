@@ -276,8 +276,14 @@ public class CardService {
                     return new ResourceNotFoundException("Card", "cardNumber", maskCardNumber(cardNumber));
                 });
         
-        log.info("Retrieved card ID: {} for account ID: {}", 
-                card.getCardId(), card.getAccount().getAccountId());
+        // Log card retrieval with defensive null check for account
+        if (card.getAccount() != null) {
+            log.info("Retrieved card ID: {} for account ID: {}", 
+                    card.getCardId(), card.getAccount().getAccountId());
+        } else {
+            log.warn("Retrieved card ID: {} with null account (data integrity issue)", 
+                    card.getCardId());
+        }
         
         return card;
     }
