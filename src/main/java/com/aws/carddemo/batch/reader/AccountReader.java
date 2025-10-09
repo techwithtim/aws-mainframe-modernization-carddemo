@@ -140,7 +140,8 @@ public class AccountReader {
      *                   mapping, database connection failure) during afterPropertiesSet() invocation
      */
     @Bean
-    public JpaPagingItemReader<Account> accountReader(EntityManagerFactory entityManagerFactory) throws Exception {
+    @org.springframework.context.annotation.Scope("prototype")
+    public JpaPagingItemReader<Account> accountJpaReader(EntityManagerFactory entityManagerFactory) throws Exception {
         JpaPagingItemReader<Account> reader = new JpaPagingItemReader<>();
         
         // Set JPQL query with WHERE clause filtering and ORDER BY for pagination
