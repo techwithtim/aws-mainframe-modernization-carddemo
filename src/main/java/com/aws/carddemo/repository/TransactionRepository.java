@@ -43,7 +43,7 @@ import java.util.List;
  * 
  * // Java equivalent with pagination and descending sort:
  * Pageable pageable = PageRequest.of(0, 20, Sort.by("processingTimestamp").descending());
- * Page<Transaction> transactions = transactionRepository.findByAccount_Id(accountId, pageable);
+ * Page<Transaction> transactions = transactionRepository.findByAccountAccountId(accountId, pageable);
  * }</pre>
  * 
  * <p><b>Date Range Reporting (replaces CBTRN03C.cbl batch logic):</b>
@@ -114,11 +114,11 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
      * <pre>{@code
      * // Get first page of 20 transactions for account 1234567890, most recent first
      * Pageable pageable = PageRequest.of(0, 20, Sort.by("processingTimestamp").descending());
-     * Page<Transaction> page = transactionRepository.findByAccount_Id(1234567890L, pageable);
+     * Page<Transaction> page = transactionRepository.findByAccountAccountId(1234567890L, pageable);
      * 
      * // Navigate pages
      * if (page.hasNext()) {
-     *     Page<Transaction> nextPage = transactionRepository.findByAccount_Id(
+     *     Page<Transaction> nextPage = transactionRepository.findByAccountAccountId(
      *         1234567890L, page.nextPageable());
      * }
      * 
@@ -138,7 +138,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
      * @return a page of transactions for the specified account, never null; empty page if no transactions found
      * @throws IllegalArgumentException if accountId is null or pageable is null
      */
-    Page<Transaction> findByAccount_Id(Long accountId, Pageable pageable);
+    Page<Transaction> findByAccountAccountId(Long accountId, Pageable pageable);
 
     /**
      * Finds paginated transactions within a specific date range based on processing timestamp,
