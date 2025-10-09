@@ -561,7 +561,10 @@ public class AccountService {
                              creditLimit,
                              proposedBalance,
                              availableCredit,
-                             exceededAmount)
+                             exceededAmount),
+                proposedBalance,
+                account.getCurrentBalance(),
+                creditLimit
             );
         }
         
