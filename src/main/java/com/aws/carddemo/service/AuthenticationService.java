@@ -118,7 +118,7 @@ public class AuthenticationService {
 
     /**
      * BCrypt password encoder for secure password verification.
-     * Configured in PasswordEncoderConfig with 10 salt rounds for ~100ms verification time.
+     * Configured in SecurityConfig with configurable salt rounds (default 10) for ~100ms verification time.
      * Replaces COBOL plain-text password comparison (IF SEC-USR-PWD = WS-USER-PWD).
      */
     private final PasswordEncoder passwordEncoder;
