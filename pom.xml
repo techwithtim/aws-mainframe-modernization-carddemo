@@ -63,6 +63,8 @@
         <caffeine.version>3.1.8</caffeine.version>
         <micrometer.version>1.13.0</micrometer.version>
         <aws-sdk.version>2.25.62</aws-sdk.version>
+        <thymeleaf.version>3.1.2.RELEASE</thymeleaf.version>
+        <itext.version>7.2.5</itext.version>
         
         <!-- Plugin Versions -->
         <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
@@ -304,8 +306,42 @@
         </dependency>
         
         <!-- ===================================================================
+             DOCUMENT GENERATION
+             Thymeleaf template engine and iText PDF library for statement generation
+             =================================================================== -->
+        
+        <!-- Thymeleaf Template Engine - HTML template processing for statement generation -->
+        <dependency>
+            <groupId>org.thymeleaf</groupId>
+            <artifactId>thymeleaf</artifactId>
+            <version>${thymeleaf.version}</version>
+        </dependency>
+        
+        <!-- Thymeleaf Spring Integration - Spring context integration for templates -->
+        <dependency>
+            <groupId>org.thymeleaf</groupId>
+            <artifactId>thymeleaf-spring6</artifactId>
+            <version>${thymeleaf.version}</version>
+        </dependency>
+        
+        <!-- iText Core - PDF generation library for statement PDFs -->
+        <dependency>
+            <groupId>com.itextpdf</groupId>
+            <artifactId>itext7-core</artifactId>
+            <version>${itext.version}</version>
+            <type>pom</type>
+        </dependency>
+        
+        <!-- iText HTML2PDF - Convert HTML to PDF for statement generation -->
+        <dependency>
+            <groupId>com.itextpdf</groupId>
+            <artifactId>html2pdf</artifactId>
+            <version>4.0.5</version>
+        </dependency>
+        
+        <!-- ===================================================================
              AWS SDK
-             AWS services integration (Secrets Manager, CloudWatch, RDS)
+             AWS services integration (Secrets Manager, CloudWatch, RDS, S3)
              =================================================================== -->
         
         <!-- AWS Secrets Manager SDK - Secure credential storage -->
@@ -326,6 +362,13 @@
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>rds</artifactId>
+            <version>${aws-sdk.version}</version>
+        </dependency>
+        
+        <!-- AWS S3 SDK - S3 object storage for statement archival -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
             <version>${aws-sdk.version}</version>
         </dependency>
         
