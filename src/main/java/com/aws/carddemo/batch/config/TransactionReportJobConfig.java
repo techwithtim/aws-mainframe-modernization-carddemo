@@ -17,6 +17,7 @@ import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
+import org.springframework.batch.item.Chunk;
 import org.springframework.batch.item.ItemWriter;
 import org.springframework.batch.item.database.JpaPagingItemReader;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,6 +33,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -605,7 +607,7 @@ public class TransactionReportJobConfig {
             this.transactionCategoryRepository = transactionCategoryRepository;
             
             // Generate output filename with timestamp
-            String timestamp = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
+            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
             String extension = this.format.equals("CSV") ? "csv" : "json";
             this.outputFilename = String.format("transaction-report-%s-%s-%s.%s",
                     startDate, endDate, timestamp, extension);
@@ -634,11 +636,11 @@ public class TransactionReportJobConfig {
          * Transactions are ordered by accountId (via TransactionReader ORDER BY clause), so writer
          * can detect account changes and write account subtotals matching COBOL logic (lines 181-188).
          * 
-         * @param chunk list of up to 100 Transaction entities read by reader
+         * @param chunk Chunk of up to 100 Transaction entities read by reader
          * @throws Exception if file I/O fails, reference data lookup fails, or S3 upload fails
          */
         @Override
-        public void write(List<? extends Transaction> chunk) throws Exception {
+        public void write(Chunk<? extends Transaction> chunk) throws Exception {
             // Initialize writer on first chunk
             if (writer == null) {
                 initializeWriter();
@@ -664,8 +666,8 @@ public class TransactionReportJobConfig {
                         transactionType.getTypeDescription() : "Unknown";
                 
                 // Lookup category description (replaces PERFORM 1500-C-LOOKUP-TRANCATG)
-                TransactionCategory transactionCategory = transactionCategoryRepository.findByCategoryCode(categoryCode)
-                        .orElse(null);
+                List<TransactionCategory> categories = transactionCategoryRepository.findByCategoryCode(categoryCode);
+                TransactionCategory transactionCategory = categories.isEmpty() ? null : categories.get(0);
                 String categoryDescription = (transactionCategory != null) ? 
                         transactionCategory.getCategoryDescription() : "Unknown";
                 
@@ -795,14 +797,17 @@ public class TransactionReportJobConfig {
         }
 
         /**
-         * Writes grand total and summary sections to the output file.
-         * Called automatically by Spring Batch after all chunks are processed.
+         * Writes grand total and summary sections to the output file and closes the writer.
+         * Should be called after all chunks are processed to finalize the report.
          * 
          * <p><b>Replaces COBOL Logic:</b> {@code 1110-WRITE-GRAND-TOTALS} (lines 318-322)
          * 
-         * @throws IOException if write operation fails
+         * <p><b>Note:</b> This method must be explicitly called, typically in an @AfterStep callback
+         * or when the writer is destroyed. It is NOT automatically invoked by Spring Batch.
+         * 
+         * @throws Exception if write operation fails
          */
-        private void finalize() throws Exception {
+        private void writeFooterAndClose() throws Exception {
             if (writer == null) {
                 return; // No transactions processed
             }
