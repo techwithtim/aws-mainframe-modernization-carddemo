@@ -451,24 +451,21 @@ public class TransactionProcessor implements ItemProcessor<DailyTransaction, Pro
             
             // Step 7: Build Approved Transaction
             // COBOL: SET TRAN-STATUS TO 'APPROVED', WRITE TRANSACT-FILE
-            return ProcessedTransaction.builder()
-                    .transactionId(transactionId)
-                    .accountId(accountId)
-                    .cardNumber(cardNumber)
-                    .transactionTypeCode(transactionTypeCode)
-                    .transactionCategoryCode(dailyTransaction.getTransactionCategoryCode())
-                    .merchantCategoryCode(merchantCategoryCode)
-                    .merchantId(dailyTransaction.getMerchantId())
-                    .merchantName(dailyTransaction.getMerchantName())
-                    .merchantCity(dailyTransaction.getMerchantCity())
-                    .merchantZip(dailyTransaction.getMerchantZip())
-                    .amount(transactionAmount)
-                    .originalTimestamp(dailyTransaction.getOriginalTimestamp())
-                    .processingTimestamp(processingTimestamp)
-                    .status(ProcessingStatus.APPROVED)
-                    .errorCode(null)
-                    .errorMessage(null)
-                    .build();
+            return new ProcessedTransaction(
+                    ProcessingStatus.APPROVED,
+                    accountId,
+                    transactionId,
+                    transactionAmount,
+                    transactionTypeCode,
+                    dailyTransaction.getTransactionCategoryCode(),
+                    processingTimestamp,
+                    dailyTransaction.getMerchantId(),
+                    dailyTransaction.getMerchantName(),
+                    dailyTransaction.getMerchantCity(),
+                    dailyTransaction.getMerchantZip(),
+                    null,  // errorCode
+                    null   // errorMessage
+            );
             
         } catch (InvalidInputException e) {
             // Unrecoverable validation failure (invalid format, Luhn check failed)
@@ -757,24 +754,21 @@ public class TransactionProcessor implements ItemProcessor<DailyTransaction, Pro
             String errorCode,
             String errorMessage) {
         
-        return ProcessedTransaction.builder()
-                .transactionId(dailyTransaction.getTransactionId())
-                .accountId(null)  // Account ID unknown for error transactions
-                .cardNumber(dailyTransaction.getCardNumber())
-                .transactionTypeCode(dailyTransaction.getTransactionTypeCode())
-                .transactionCategoryCode(dailyTransaction.getTransactionCategoryCode())
-                .merchantCategoryCode(MCC_DEFAULT)
-                .merchantId(dailyTransaction.getMerchantId())
-                .merchantName(dailyTransaction.getMerchantName())
-                .merchantCity(dailyTransaction.getMerchantCity())
-                .merchantZip(dailyTransaction.getMerchantZip())
-                .amount(dailyTransaction.getAmount())
-                .originalTimestamp(dailyTransaction.getOriginalTimestamp())
-                .processingTimestamp(LocalDateTime.now())
-                .status(ProcessingStatus.ERROR)
-                .errorCode(errorCode)
-                .errorMessage(errorMessage)
-                .build();
+        return new ProcessedTransaction(
+                ProcessingStatus.ERROR,
+                null,  // Account ID unknown for error transactions
+                dailyTransaction.getTransactionId(),
+                dailyTransaction.getAmount(),
+                dailyTransaction.getTransactionTypeCode(),
+                dailyTransaction.getTransactionCategoryCode(),
+                LocalDateTime.now(),  // processingTimestamp
+                dailyTransaction.getMerchantId(),
+                dailyTransaction.getMerchantName(),
+                dailyTransaction.getMerchantCity(),
+                dailyTransaction.getMerchantZip(),
+                errorCode,
+                errorMessage
+        );
     }
     
     /**
@@ -805,24 +799,21 @@ public class TransactionProcessor implements ItemProcessor<DailyTransaction, Pro
             String errorCode,
             String errorMessage) {
         
-        return ProcessedTransaction.builder()
-                .transactionId(dailyTransaction.getTransactionId())
-                .accountId(accountId)
-                .cardNumber(dailyTransaction.getCardNumber())
-                .transactionTypeCode(dailyTransaction.getTransactionTypeCode())
-                .transactionCategoryCode(dailyTransaction.getTransactionCategoryCode())
-                .merchantCategoryCode(MCC_DEFAULT)
-                .merchantId(dailyTransaction.getMerchantId())
-                .merchantName(dailyTransaction.getMerchantName())
-                .merchantCity(dailyTransaction.getMerchantCity())
-                .merchantZip(dailyTransaction.getMerchantZip())
-                .amount(dailyTransaction.getAmount())
-                .originalTimestamp(dailyTransaction.getOriginalTimestamp())
-                .processingTimestamp(LocalDateTime.now())
-                .status(ProcessingStatus.DECLINED)
-                .errorCode(errorCode)
-                .errorMessage(errorMessage)
-                .build();
+        return new ProcessedTransaction(
+                ProcessingStatus.DECLINED,
+                accountId,
+                dailyTransaction.getTransactionId(),
+                dailyTransaction.getAmount(),
+                dailyTransaction.getTransactionTypeCode(),
+                dailyTransaction.getTransactionCategoryCode(),
+                LocalDateTime.now(),  // processingTimestamp
+                dailyTransaction.getMerchantId(),
+                dailyTransaction.getMerchantName(),
+                dailyTransaction.getMerchantCity(),
+                dailyTransaction.getMerchantZip(),
+                errorCode,
+                errorMessage
+        );
     }
     
     /**
