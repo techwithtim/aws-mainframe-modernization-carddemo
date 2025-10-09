@@ -516,10 +516,10 @@ public class PaymentService {
             log.warn("Account has zero or negative balance: AccountId={}, Balance={}", 
                     accountId, currentBalance);
             throw new InsufficientFundsException(
+                    "Account has zero or negative balance. No payment needed.",
                     paymentAmount, 
                     currentBalance, 
-                    account.getCreditLimit(),
-                    "Account has zero or negative balance. No payment needed."
+                    account.getCreditLimit()
             );
         }
         
