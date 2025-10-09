@@ -11,10 +11,16 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 /**
- * Spring Security configuration class defining the password encoder bean for the CardDemo application.
+ * Documentation class for BCrypt password encoding implementation in the CardDemo application.
  * 
- * <p>This configuration replaces the legacy COBOL plain-text password storage and comparison mechanism
- * with modern BCrypt cryptographic hashing to meet PCI-DSS compliance requirements.</p>
+ * <p><strong>NOTE:</strong> The actual {@code passwordEncoder} bean is defined in 
+ * {@link com.aws.carddemo.config.SecurityConfig} with configurable BCrypt strength.
+ * This class is retained for comprehensive documentation of the COBOL-to-Java password 
+ * migration strategy and BCrypt implementation details.</p>
+ * 
+ * <p>This documentation explains how the CardDemo modernization replaces the legacy COBOL 
+ * plain-text password storage and comparison mechanism with modern BCrypt cryptographic 
+ * hashing to meet PCI-DSS compliance requirements.</p>
  * 
  * <h2>Legacy COBOL Implementation (INSECURE - Replaced)</h2>
  * <p>The original CardDemo application stored passwords as 8-character plain-text values:</p>
@@ -86,21 +92,22 @@ import org.springframework.security.crypto.password.PasswordEncoder;
  *   <li><b>Future-proof:</b> Work factor can be increased without algorithm change</li>
  * </ul>
  * 
- * <h2>Usage</h2>
- * <p>This bean is automatically injected into:</p>
+ * <h2>Actual Bean Location</h2>
+ * <p>The {@code passwordEncoder} bean is defined in {@link com.aws.carddemo.config.SecurityConfig#passwordEncoder()}
+ * and is automatically injected into:</p>
  * <ul>
  *   <li>{@code AuthenticationService} - For login credential validation</li>
  *   <li>{@code UserService} - For password hashing during user creation and updates</li>
  *   <li>{@code UserDetailsServiceImpl} - For Spring Security authentication provider</li>
  * </ul>
  * 
+ * @see com.aws.carddemo.config.SecurityConfig#passwordEncoder()
  * @see org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
  * @see org.springframework.security.crypto.password.PasswordEncoder
  * @author AWS CardDemo Modernization Team
  * @version 1.0
  * @since 1.0
  */
-@Configuration
 public class PasswordEncoderConfig {
 
     /**
@@ -205,9 +212,11 @@ public class PasswordEncoderConfig {
      * 
      * @see BCryptPasswordEncoder#encode(CharSequence)
      * @see BCryptPasswordEncoder#matches(CharSequence, String)
+     * 
+     * <p><strong>NOTE:</strong> This is now a documentation/example method. The actual 
+     * {@code passwordEncoder} bean is defined in {@link com.aws.carddemo.config.SecurityConfig}.</p>
      */
-    @Bean
-    public PasswordEncoder passwordEncoder() {
+    public PasswordEncoder examplePasswordEncoder() {
         return new BCryptPasswordEncoder(BCRYPT_STRENGTH);
     }
 }
