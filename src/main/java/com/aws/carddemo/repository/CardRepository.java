@@ -46,7 +46,7 @@ import java.util.Optional;
  *       ... process up to 7 records per page ...
  *    END-PERFORM
  *    ↓
- *    Page&lt;Card&gt; findByAccountId(Long accountId, Pageable pageable)
+ *    Page&lt;Card&gt; findByAccountAccountId(Long accountId, Pageable pageable)
  * 
  * 3. Sequential Scan for Batch Processing:
  *    PERFORM UNTIL EOF-CARDDAT
@@ -69,13 +69,13 @@ import java.util.Optional;
  *       nullable Card, enforcing explicit null handling at call sites. Replaces COBOL FILE STATUS
  *       '23' (record not found) checks with modern Java Optional pattern.</li>
  *   
- *   <li><b>Pagination Support:</b> findByAccountId accepts Pageable parameter enabling page-based
+ *   <li><b>Pagination Support:</b> findByAccountAccountId accepts Pageable parameter enabling page-based
  *       result sets (Page 1 = cards 1-20, Page 2 = cards 21-40). Replaces COBOL WS-MAX-SCREEN-LINES
  *       pagination logic (7 cards per screen in COCRDLIC.cbl) with flexible page size control.</li>
  *   
  *   <li><b>Index Utilization:</b> All query methods leverage database indexes defined in Card entity
  *       (@Index annotations). idx_card_number unique index ensures O(log n) findByCardNumber
- *       performance; idx_card_account secondary index optimizes findByAccountId queries.</li>
+ *       performance; idx_card_account secondary index optimizes findByAccountAccountId queries.</li>
  *   
  *   <li><b>Transaction Management:</b> All repository methods participate in Spring @Transactional
  *       contexts. Read operations use read-only transactions (performance optimization); write
@@ -151,7 +151,7 @@ import java.util.Optional;
  * // Example 2: Card list browse with pagination (COCRDLIC.cbl equivalent)
  * public Page&lt;CardResponse&gt; getCardsByAccount(Long accountId, int pageNumber) {
  *     Pageable pageable = PageRequest.of(pageNumber, 7, Sort.by("cardNumber"));
- *     Page&lt;Card&gt; cardPage = cardRepository.findByAccountId(accountId, pageable);
+ *     Page&lt;Card&gt; cardPage = cardRepository.findByAccountAccountId(accountId, pageable);
  *     return cardPage.map(CardMapper::toResponse);  // Convert entities to DTOs
  * }
  * 
@@ -233,7 +233,7 @@ import java.util.Optional;
  * 
  *         // When: Request page 1 with size 7 (COBOL screen size)
  *         Pageable pageable = PageRequest.of(0, 7, Sort.by("cardNumber"));
- *         Page&lt;Card&gt; page = cardRepository.findByAccountId(account.getAccountId(), pageable);
+ *         Page&lt;Card&gt; page = cardRepository.findByAccountAccountId(account.getAccountId(), pageable);
  * 
  *         // Then: Page contains 7 cards with correct total
  *         assertThat(page.getContent()).hasSize(7);
@@ -278,18 +278,18 @@ import java.util.Optional;
  * <ul>
  *   <li>Section 6.2.2.1: Card Master Table - Defines table schema, indexes, and query patterns
  *       supported by this repository including findByCardNumber for authorization lookups and
- *       findByAccountId for card list browse operations</li>
+ *       findByAccountAccountId for card list browse operations</li>
  *   
  *   <li>Section 0.4.1 File Transformation: Repository layer must use Spring Data JPA with
  *       PostgreSQL replacing VSAM file access, implementing findByCardNumber for primary key
- *       access with PCI-DSS masking and findByAccountId with Pageable for pagination</li>
+ *       access with PCI-DSS masking and findByAccountAccountId with Pageable for pagination</li>
  *   
  *   <li>Section 0.8.1 Critical Directive #3: PCI-DSS compliance requirement mandating card
  *       number masking displays last 4 digits only per PCI-DSS requirement 3.3, enforced
  *       via Card.getCardNumberMasked() method called in service layer after repository retrieval</li>
  *   
  *   <li>Section 2.2: Detailed Process Flows - Card inquiry flow (COCRDSLC.cbl) maps to
- *       findByCardNumber; card list browse flow (COCRDLIC.cbl) maps to findByAccountId with
+ *       findByCardNumber; card list browse flow (COCRDLIC.cbl) maps to findByAccountAccountId with
  *       pagination support matching 7-row screen display limit</li>
  * </ul>
  * 
@@ -434,15 +434,15 @@ public interface CardRepository extends JpaRepository<Card, Long> {
      * Java Pattern (flexible page size):
      *     // Page 1 with 7 cards (matching COBOL screen)
      *     Pageable page1 = PageRequest.of(0, 7, Sort.by("cardNumber").ascending());
-     *     Page&lt;Card&gt; cards = cardRepository.findByAccountId(accountId, page1);
+     *     Page&lt;Card&gt; cards = cardRepository.findByAccountAccountId(accountId, page1);
      * 
      *     // Page 2 (next screen via PF8 key)
      *     Pageable page2 = PageRequest.of(1, 7, Sort.by("cardNumber").ascending());
-     *     Page&lt;Card&gt; moreCards = cardRepository.findByAccountId(accountId, page2);
+     *     Page&lt;Card&gt; moreCards = cardRepository.findByAccountAccountId(accountId, page2);
      * 
      *     // Larger pages for API clients (20 cards)
      *     Pageable page20 = PageRequest.of(0, 20, Sort.by("expirationDate").descending());
-     *     Page&lt;Card&gt; apiCards = cardRepository.findByAccountId(accountId, page20);
+     *     Page&lt;Card&gt; apiCards = cardRepository.findByAccountAccountId(accountId, page20);
      * </pre>
      * 
      * <p><b>Sorting Options:</b> Pageable.sort parameter controls result ordering:
@@ -483,7 +483,7 @@ public interface CardRepository extends JpaRepository<Card, Long> {
      *         Pageable pageable = PageRequest.of(page, size, Sort.by("cardNumber"));
      * 
      *         // Query cards with pagination (COBOL STARTBR/READNEXT loop)
-     *         Page&lt;Card&gt; cardPage = cardRepository.findByAccountId(accountId, pageable);
+     *         Page&lt;Card&gt; cardPage = cardRepository.findByAccountAccountId(accountId, pageable);
      * 
      *         // Convert entities to DTOs with masked card numbers
      *         return cardPage.map(card -&gt; {
@@ -531,7 +531,7 @@ public interface CardRepository extends JpaRepository<Card, Long> {
      * @see Pageable for pagination parameter construction via PageRequest
      * @see Card#account for account relationship documentation
      */
-    Page<Card> findByAccountId(Long accountId, Pageable pageable);
+    Page<Card> findByAccountAccountId(Long accountId, Pageable pageable);
 
     /**
      * Finds all cards with expiration dates before the specified date.
