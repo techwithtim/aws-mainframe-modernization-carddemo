@@ -143,7 +143,6 @@ class InterestCalculationServiceTest {
         // Create disclosure group with standard APR (18.99%)
         DisclosureGroupId standardGroupId = new DisclosureGroupId("STANDARD", "01", "0001");
         standardDisclosureGroup = DisclosureGroup.builder()
-                .disclosureGroupId(standardGroupId)
                 .accountGroupId("STANDARD")
                 .transactionTypeCode("01")
                 .transactionCategoryCode("0001")
@@ -153,7 +152,6 @@ class InterestCalculationServiceTest {
         // Create disclosure group with high APR (24.99%)
         DisclosureGroupId highRateGroupId = new DisclosureGroupId("STANDARD", "01", "0002");
         highRateDisclosureGroup = DisclosureGroup.builder()
-                .disclosureGroupId(highRateGroupId)
                 .accountGroupId("STANDARD")
                 .transactionTypeCode("01")
                 .transactionCategoryCode("0002")
@@ -163,7 +161,6 @@ class InterestCalculationServiceTest {
         // Create disclosure group with low APR (12.00%)
         DisclosureGroupId lowRateGroupId = new DisclosureGroupId("STANDARD", "01", "0003");
         lowRateDisclosureGroup = DisclosureGroup.builder()
-                .disclosureGroupId(lowRateGroupId)
                 .accountGroupId("STANDARD")
                 .transactionTypeCode("01")
                 .transactionCategoryCode("0003")
@@ -173,7 +170,6 @@ class InterestCalculationServiceTest {
         // Create disclosure group with maximum APR (29.99%)
         DisclosureGroupId maxRateGroupId = new DisclosureGroupId("STANDARD", "01", "0004");
         maxRateDisclosureGroup = DisclosureGroup.builder()
-                .disclosureGroupId(maxRateGroupId)
                 .accountGroupId("STANDARD")
                 .transactionTypeCode("01")
                 .transactionCategoryCode("0004")
@@ -183,7 +179,6 @@ class InterestCalculationServiceTest {
         // Create disclosure group with zero APR (0.00%) - promotional rate
         DisclosureGroupId zeroRateGroupId = new DisclosureGroupId("STANDARD", "01", "0005");
         zeroRateDisclosureGroup = DisclosureGroup.builder()
-                .disclosureGroupId(zeroRateGroupId)
                 .accountGroupId("STANDARD")
                 .transactionTypeCode("01")
                 .transactionCategoryCode("0005")
@@ -845,7 +840,6 @@ class InterestCalculationServiceTest {
         // Mock primary group not found, but DEFAULT group found
         DisclosureGroupId defaultGroupId = new DisclosureGroupId("DEFAULT", "01", "0001");
         DisclosureGroup defaultGroup = DisclosureGroup.builder()
-                .disclosureGroupId(defaultGroupId)
                 .accountGroupId("DEFAULT")
                 .transactionTypeCode("01")
                 .transactionCategoryCode("0001")
