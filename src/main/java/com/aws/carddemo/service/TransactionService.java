@@ -7,6 +7,7 @@ import com.aws.carddemo.model.Account;
 import com.aws.carddemo.model.CardXref;
 import com.aws.carddemo.model.Transaction;
 import com.aws.carddemo.model.TransactionCategoryBalance;
+import com.aws.carddemo.model.TransactionCategoryBalanceId;
 import com.aws.carddemo.repository.AccountRepository;
 import com.aws.carddemo.repository.CardXrefRepository;
 import com.aws.carddemo.repository.TransactionCategoryBalanceRepository;
@@ -153,7 +154,7 @@ public class TransactionService {
         }
 
         // Execute paginated query (replaces COBOL STARTBR/READNEXT loop)
-        Page<Transaction> transactionPage = transactionRepository.findByAccountId(accountId, pageable);
+        Page<Transaction> transactionPage = transactionRepository.findByAccountAccountId(accountId, pageable);
 
         log.info("Retrieved {} transactions for account {}, page {} of {}",
                 transactionPage.getNumberOfElements(),
@@ -276,6 +277,8 @@ public class TransactionService {
      *                          positive for purchases/charges, negative for refunds/credits,
      *                          must be non-zero (COBOL PIC S9(09)V99 COMP-3 equivalent)
      * @param merchantName merchant name for transaction description (max 50 characters)
+     * @param transactionTypeCode transaction type code (e.g., "01" purchase, "02" payment),
+     *                            must exist in TRANSACTION_TYPE reference table
      * @param transactionCategoryCode transaction category code (e.g., "01" grocery, "02" fuel),
      *                                must exist in TRANSACTION_CATEGORY reference table
      * @param transactionDate original transaction authorization date from merchant (YYYY-MM-DD),
@@ -290,13 +293,15 @@ public class TransactionService {
             String cardNumber,
             BigDecimal transactionAmount,
             String merchantName,
+            String transactionTypeCode,
             String transactionCategoryCode,
             LocalDate transactionDate) {
 
-        log.debug("Posting transaction: cardNumber=**{}**, amount={}, merchant={}, category={}, date={}",
+        log.debug("Posting transaction: cardNumber=**{}**, amount={}, merchant={}, type={}, category={}, date={}",
                 cardNumber.length() >= 4 ? cardNumber.substring(cardNumber.length() - 4) : "****",
                 transactionAmount,
                 merchantName,
+                transactionTypeCode,
                 transactionCategoryCode,
                 transactionDate);
 
@@ -344,6 +349,7 @@ public class TransactionService {
                 .cardNumber(cardNumber)
                 .amount(transactionAmount)
                 .merchantName(merchantName)
+                .transactionTypeCode(transactionTypeCode)
                 .transactionCategoryCode(transactionCategoryCode)
                 .originalTimestamp(transactionDate != null ? transactionDate.atStartOfDay() : LocalDateTime.now())
                 .processingTimestamp(LocalDateTime.now())
@@ -378,9 +384,11 @@ public class TransactionService {
 
         // Step 6: Category Balance Update (CBTRN02C.cbl lines 506-542)
         // COBOL: ADD DALYTRAN-AMT TO TCAT-BAL (line 527)
+        TransactionCategoryBalanceId categoryBalanceId = new TransactionCategoryBalanceId(
+                accountId, transactionTypeCode, transactionCategoryCode);
+        
         Optional<TransactionCategoryBalance> categoryBalanceOpt =
-                transactionCategoryBalanceRepository.findByAccountIdAndCategoryCode(
-                        accountId, transactionCategoryCode);
+                transactionCategoryBalanceRepository.findById(categoryBalanceId);
 
         TransactionCategoryBalance categoryBalance;
         if (categoryBalanceOpt.isPresent()) {
@@ -389,12 +397,13 @@ public class TransactionService {
             BigDecimal oldCategoryBalance = categoryBalance.getCategoryBalance();
             BigDecimal newCategoryBalance = oldCategoryBalance.add(transactionAmount);
             categoryBalance.setCategoryBalance(newCategoryBalance);
-            log.debug("Updated category balance: category={}, old={}, new={}",
-                    transactionCategoryCode, oldCategoryBalance, newCategoryBalance);
+            log.debug("Updated category balance: type={}, category={}, old={}, new={}",
+                    transactionTypeCode, transactionCategoryCode, oldCategoryBalance, newCategoryBalance);
         } else {
             // New category balance: initialize with transaction amount
             categoryBalance = TransactionCategoryBalance.builder()
                     .accountId(accountId)
+                    .transactionTypeCode(transactionTypeCode)
                     .transactionCategoryCode(transactionCategoryCode)
                     .categoryBalance(transactionAmount)
                     .build();
@@ -451,11 +460,12 @@ public class TransactionService {
         }
 
         // Execute date range query
-        LocalDateTime startDateTime = startDate != null ? startDate.atStartOfDay() : LocalDateTime.MIN;
-        LocalDateTime endDateTime = endDate != null ? endDate.atTime(23, 59, 59) : LocalDateTime.MAX;
+        // Repository method accepts LocalDate and uses DATE() function in JPQL for date-only comparison
+        LocalDate effectiveStartDate = startDate != null ? startDate : LocalDate.MIN;
+        LocalDate effectiveEndDate = endDate != null ? endDate : LocalDate.MAX;
 
         Page<Transaction> transactions = transactionRepository.findByTransactionDateBetween(
-                startDateTime, endDateTime, pageable);
+                effectiveStartDate, effectiveEndDate, pageable);
 
         log.info("Retrieved {} transactions for account {} in date range {} to {}",
                 transactions.getNumberOfElements(), accountId, startDate, endDate);
@@ -538,7 +548,10 @@ public class TransactionService {
                 });
 
         // Retrieve all transactions for account (could be optimized with aggregation query)
-        java.util.List<Transaction> transactions = transactionRepository.findByAccountIdOrderByProcessingTimestampDesc(accountId);
+        // Using unpaged to get all results; consider adding database aggregation for large accounts
+        Page<Transaction> transactionPage = transactionRepository.findByAccountAccountId(
+                accountId, Pageable.unpaged());
+        java.util.List<Transaction> transactions = transactionPage.getContent();
 
         // Calculate summary statistics
         java.util.Map<String, Object> summary = new java.util.HashMap<>();
