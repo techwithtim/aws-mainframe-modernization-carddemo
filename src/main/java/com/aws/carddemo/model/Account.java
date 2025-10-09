@@ -176,6 +176,38 @@ public class Account extends BaseEntity implements Serializable {
     private BigDecimal currentCycleDebit;
 
     /**
+     * Total interest paid year-to-date.
+     * Accumulated monthly by interest calculation batch job (CBACT04C.cbl migration).
+     * Reset to zero at beginning of calendar year.
+     * 
+     * <p><b>Modernization Enhancement:</b> This field represents a new feature for the
+     * modernized application. The original COBOL CBACT04C.cbl program maintained a
+     * working storage variable (WS-TOTAL-INT) for year-to-date interest accumulation
+     * during batch processing, but this value was not persisted to the VSAM ACCTFILE.
+     * The 178-byte FILLER in CVACT01Y.cpy copybook provided reserved space for future
+     * enhancements. In the modernized system, we persist this value to the database
+     * for improved financial reporting, audit capabilities, and regulatory compliance.
+     * 
+     * <p><b>Business Rules:</b>
+     * - Accumulates monthly interest charges from InterestProcessor batch component
+     * - Updated by AccountWriter after interest calculation completes
+     * - Supports 1099-INT tax reporting at year end
+     * - Provides transparency for customer financial statements
+     * 
+     * <p><b>Database Schema:</b> This field requires a corresponding database column
+     * added via Flyway migration script with default value 0.00 for existing accounts.
+     * 
+     * COBOL Mapping: N/A (new field - utilizes reserved FILLER space in CVACT01Y.cpy)
+     * Batch Integration: InterestProcessor → InterestTransaction → AccountWriter
+     */
+    @Column(name = "interest_paid_ytd", nullable = false, precision = 12, scale = 2)
+    @NotNull(message = "Interest paid year-to-date is required")
+    @Digits(integer = 10, fraction = 2, message = "Interest paid YTD must have at most 10 integer digits and 2 decimal places")
+    @DecimalMin(value = "0.00", inclusive = true, message = "Interest paid YTD cannot be negative")
+    @Builder.Default
+    private BigDecimal interestPaidYtd = BigDecimal.ZERO;
+
+    /**
      * Date account was opened.
      * Must be in the past or today.
      * 
