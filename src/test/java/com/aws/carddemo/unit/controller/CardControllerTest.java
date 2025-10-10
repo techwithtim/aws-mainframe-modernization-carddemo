@@ -43,6 +43,9 @@ import com.aws.carddemo.controller.CardController;
 import com.aws.carddemo.dto.request.CardUpdateRequest;
 import com.aws.carddemo.dto.response.CardResponse;
 import com.aws.carddemo.service.CardService;
+import com.aws.carddemo.service.MenuService;
+import com.aws.carddemo.service.ReportService;
+import com.aws.carddemo.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -51,13 +54,23 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentMatchers;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Bean;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.aws.carddemo.model.Card;
@@ -117,9 +130,45 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @version 1.0.0
  * @since 2024
  */
-@WebMvcTest(CardController.class)
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
 @DisplayName("CardController Unit Tests")
 public class CardControllerTest {
+
+    /**
+     * Test security configuration that enables method-level security for @PreAuthorize testing.
+     * 
+     * <p>This configuration is necessary because the main SecurityConfig has @Profile("!test"),
+     * which excludes it from test execution. This test configuration ensures @PreAuthorize
+     * annotations are properly enforced during testing.</p>
+     */
+    @TestConfiguration
+    @EnableMethodSecurity(prePostEnabled = true)
+    @EnableWebSecurity
+    static class TestSecurityConfig {
+        
+        @Bean
+        public SecurityFilterChain cardTestSecurityFilterChain(HttpSecurity http) throws Exception {
+            http
+                    .csrf(AbstractHttpConfigurer::disable)
+                    .authorizeHttpRequests(auth -> auth
+                            .anyRequest().authenticated()
+                    )
+                    .exceptionHandling(exception -> exception
+                            .authenticationEntryPoint((request, response, authException) -> {
+                                response.setStatus(401);
+                                response.setContentType("application/json");
+                                response.getWriter().write("{\"message\":\"Unauthorized\"}");
+                            })
+                    )
+                    .sessionManagement(session -> session
+                            .sessionCreationPolicy(org.springframework.security.config.http.SessionCreationPolicy.STATELESS)
+                    );
+            
+            return http.build();
+        }
+    }
 
     @Autowired
     private MockMvc mockMvc;
@@ -129,6 +178,15 @@ public class CardControllerTest {
 
     @MockBean
     private CardMapper cardMapper;
+
+    @MockBean
+    private MenuService menuService;
+
+    @MockBean
+    private UserRepository userRepository;
+
+    @MockBean
+    private ReportService reportService;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -159,7 +217,7 @@ public class CardControllerTest {
         testAccount = new Account();
         testAccount.setAccountId(12345678901L);
         testAccount.setAccountNumber("12345678901");
-        testAccount.setAccountStatus("A");
+        testAccount.setActiveStatus("Y");
         testAccount.setCurrentBalance(BigDecimal.valueOf(5000.00));
         testAccount.setCreditLimit(BigDecimal.valueOf(10000.00));
 
@@ -204,11 +262,12 @@ public class CardControllerTest {
      * </ul>
      */
     @Test
+    @WithMockUser(roles = "USER")
     @DisplayName("Test GET /api/v1/cards/id/{id} - Success with masked card number")
     public void testGetCardById_Success() throws Exception {
         // Arrange: Mock service layer to return test card
         when(cardService.getCardById(anyLong())).thenReturn(testCard);
-        when(cardMapper.toResponse(any(Card.class))).thenReturn(testCardResponse);
+        when(cardMapper.toResponse(ArgumentMatchers.any(Card.class))).thenReturn(testCardResponse);
 
         // Act & Assert: Perform GET request and validate response
         mockMvc.perform(get("/api/v1/cards/id/{id}", 1L)
@@ -248,6 +307,7 @@ public class CardControllerTest {
      * </ul>
      */
     @Test
+    @WithMockUser(roles = "USER")
     @DisplayName("Test GET /api/v1/cards/id/{id} - Card Not Found (404)")
     public void testGetCardById_NotFound() throws Exception {
         // Arrange: Mock service to throw ResourceNotFoundException
@@ -261,7 +321,7 @@ public class CardControllerTest {
 
         // Verify service method was called
         verify(cardService, times(1)).getCardById(999L);
-        verify(cardMapper, never()).toResponse(any(Card.class));
+        verify(cardMapper, never()).toResponse(ArgumentMatchers.any(Card.class));
     }
 
     /**
@@ -292,6 +352,7 @@ public class CardControllerTest {
      * </ul>
      */
     @Test
+    @WithMockUser(roles = "USER")
     @DisplayName("Test GET /api/v1/accounts/{accountId}/cards - Success with pagination")
     public void testGetCardsByAccountId_Success() throws Exception {
         // Arrange: Create additional test cards
@@ -317,7 +378,7 @@ public class CardControllerTest {
         Page<Card> cardPage = new PageImpl<>(cardList, PageRequest.of(0, 10), 2);
 
         // Mock service and mapper
-        when(cardService.getCardsByAccountId(anyLong(), any(Pageable.class)))
+        when(cardService.getCardsByAccountId(anyLong(), ArgumentMatchers.any(Pageable.class)))
                 .thenReturn(cardPage);
         when(cardMapper.toResponse(testCard)).thenReturn(testCardResponse);
         when(cardMapper.toResponse(card2)).thenReturn(cardResponse2);
@@ -343,8 +404,8 @@ public class CardControllerTest {
                 .andExpect(jsonPath("$.size").value(10));
 
         // Verify service method was called
-        verify(cardService, times(1)).getCardsByAccountId(eq(12345678901L), any(Pageable.class));
-        verify(cardMapper, times(2)).toResponse(any(Card.class));
+        verify(cardService, times(1)).getCardsByAccountId(eq(12345678901L), ArgumentMatchers.any(Pageable.class));
+        verify(cardMapper, times(2)).toResponse(ArgumentMatchers.any(Card.class));
     }
 
     /**
@@ -366,12 +427,13 @@ public class CardControllerTest {
      * </ul>
      */
     @Test
+    @WithMockUser(roles = "USER")
     @DisplayName("Test GET /api/v1/accounts/{accountId}/cards - Empty list for account with no cards")
     public void testGetCardsByAccountId_EmptyList() throws Exception {
         // Arrange: Create empty page
         Page<Card> emptyPage = new PageImpl<>(Collections.emptyList(), PageRequest.of(0, 10), 0);
 
-        when(cardService.getCardsByAccountId(anyLong(), any(Pageable.class)))
+        when(cardService.getCardsByAccountId(anyLong(), ArgumentMatchers.any(Pageable.class)))
                 .thenReturn(emptyPage);
 
         // Act & Assert: Perform GET request and validate response
@@ -389,8 +451,8 @@ public class CardControllerTest {
                 .andExpect(jsonPath("$.size").value(10));
 
         // Verify service method was called
-        verify(cardService, times(1)).getCardsByAccountId(eq(12345678901L), any(Pageable.class));
-        verify(cardMapper, never()).toResponse(any(Card.class));
+        verify(cardService, times(1)).getCardsByAccountId(eq(12345678901L), ArgumentMatchers.any(Pageable.class));
+        verify(cardMapper, never()).toResponse(ArgumentMatchers.any(Card.class));
     }
 
     /**
@@ -420,11 +482,12 @@ public class CardControllerTest {
      * </ul>
      */
     @Test
+    @WithMockUser(roles = "USER")
     @DisplayName("Test GET /api/v1/cards/{cardNumber} - Success with enriched card details")
     public void testGetCardByCardNumber_Success() throws Exception {
         // Arrange: Mock service to return enriched card with account info
         when(cardService.getCardWithAccountInfo(anyString())).thenReturn(testCard);
-        when(cardMapper.toResponse(any(Card.class))).thenReturn(testCardResponse);
+        when(cardMapper.toResponse(ArgumentMatchers.any(Card.class))).thenReturn(testCardResponse);
 
         // Act & Assert: Perform GET request and validate response
         mockMvc.perform(get("/api/v1/cards/{cardNumber}", "4506445678901234")
@@ -463,6 +526,7 @@ public class CardControllerTest {
      * </ul>
      */
     @Test
+    @WithMockUser(roles = "USER")
     @DisplayName("Test GET /api/v1/cards/{cardNumber} - Invalid card number format (400)")
     public void testGetCardByCardNumber_InvalidFormat() throws Exception {
         // Act & Assert: Perform GET request with invalid card number (not 16 digits)
@@ -472,7 +536,7 @@ public class CardControllerTest {
 
         // Verify service method was not called
         verify(cardService, never()).getCardWithAccountInfo(anyString());
-        verify(cardMapper, never()).toResponse(any(Card.class));
+        verify(cardMapper, never()).toResponse(ArgumentMatchers.any(Card.class));
     }
 
     /**
@@ -506,6 +570,7 @@ public class CardControllerTest {
      * </ul>
      */
     @Test
+    @WithMockUser(roles = "USER")
     @DisplayName("Test PUT /api/v1/cards/{id} - Success with updated card details")
     public void testUpdateCard_Success() throws Exception {
         // Arrange: Create update request
@@ -529,7 +594,7 @@ public class CardControllerTest {
         // Mock service and mapper
         when(cardService.getCardById(anyLong())).thenReturn(testCard);
         when(cardService.updateCardStatus(anyLong(), anyString())).thenReturn(testCard);
-        when(cardMapper.toResponse(any(Card.class))).thenReturn(testCardResponse, updatedCardResponse);
+        when(cardMapper.toResponse(ArgumentMatchers.any(Card.class))).thenReturn(testCardResponse, updatedCardResponse);
 
         // Act & Assert: Perform PUT request and validate response
         mockMvc.perform(put("/api/v1/cards/{id}", 1L)
@@ -565,6 +630,7 @@ public class CardControllerTest {
      * </ul>
      */
     @Test
+    @WithMockUser(roles = "USER")
     @DisplayName("Test PUT /api/v1/cards/{id} - Validation failure with invalid inputs (400)")
     public void testUpdateCard_ValidationError() throws Exception {
         // Arrange: Create update request with invalid data
@@ -606,6 +672,7 @@ public class CardControllerTest {
      * </ul>
      */
     @Test
+    @WithMockUser(roles = "USER")
     @DisplayName("Test PUT /api/v1/cards/{id} - Card not found (404)")
     public void testUpdateCard_NotFound() throws Exception {
         // Arrange: Create valid update request
@@ -651,6 +718,7 @@ public class CardControllerTest {
      * </ul>
      */
     @Test
+    @WithMockUser(roles = "USER")
     @DisplayName("Test PUT /api/v1/cards/{id} - Cannot activate expired card (400)")
     public void testUpdateCard_CannotActivateExpiredCard() throws Exception {
         // Arrange: Create expired card
@@ -671,7 +739,7 @@ public class CardControllerTest {
 
         // Mock service to return expired card, then throw exception on activation
         when(cardService.getCardById(anyLong())).thenReturn(expiredCard);
-        when(cardMapper.toResponse(any(Card.class))).thenReturn(testCardResponse);
+        when(cardMapper.toResponse(ArgumentMatchers.any(Card.class))).thenReturn(testCardResponse);
         when(cardService.updateCardStatus(anyLong(), eq("Y")))
                 .thenThrow(new InvalidInputException("activeStatus", 
                         "Cannot activate card that expired on 2020-12-31"));
@@ -710,6 +778,7 @@ public class CardControllerTest {
             "C,N,Closed - Card permanently closed",
             "S,N,Suspended - Card temporarily suspended"
     })
+    @WithMockUser(roles = "USER")
     @DisplayName("Test card status transitions with various status codes")
     public void testCardStatusTransitions(String cardStatus, 
                                           String expectedActiveStatus, 
@@ -735,7 +804,7 @@ public class CardControllerTest {
         // Mock service and mapper
         when(cardService.getCardById(anyLong())).thenReturn(testCard);
         when(cardService.updateCardStatus(anyLong(), eq(expectedActiveStatus))).thenReturn(testCard);
-        when(cardMapper.toResponse(any(Card.class))).thenReturn(testCardResponse, statusResponse);
+        when(cardMapper.toResponse(ArgumentMatchers.any(Card.class))).thenReturn(testCardResponse, statusResponse);
 
         // Act & Assert: Perform PUT request and validate status
         mockMvc.perform(put("/api/v1/cards/{id}", 1L)
@@ -765,11 +834,12 @@ public class CardControllerTest {
      * <p>The implementation shows only the last 4 digits for enhanced security.
      */
     @Test
+    @WithMockUser(roles = "USER")
     @DisplayName("Test PCI-DSS compliant card number masking in response")
     public void testCardNumberMasking_PciDssCompliance() throws Exception {
         // Arrange: Mock service
         when(cardService.getCardById(anyLong())).thenReturn(testCard);
-        when(cardMapper.toResponse(any(Card.class))).thenReturn(testCardResponse);
+        when(cardMapper.toResponse(ArgumentMatchers.any(Card.class))).thenReturn(testCardResponse);
 
         // Act & Assert: Verify masked card number format
         mockMvc.perform(get("/api/v1/cards/id/{id}", 1L)
