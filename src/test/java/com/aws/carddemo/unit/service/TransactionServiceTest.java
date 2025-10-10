@@ -388,7 +388,7 @@ class TransactionServiceTest {
 
         when(cardXrefRepository.findByCardNumber(cardNumber)).thenReturn(Optional.of(testCardXref));
         when(accountRepository.findByIdWithLock(1L)).thenReturn(Optional.of(testAccount));
-        doNothing().when(accountService).validateCreditLimit(testAccount, transactionAmount);
+        doNothing().when(accountService).validateCreditLimit(eq(testAccount), any(BigDecimal.class));
         when(transactionRepository.save(any(Transaction.class))).thenReturn(testTransaction);
         when(accountRepository.save(any(Account.class))).thenReturn(testAccount);
         
@@ -402,7 +402,8 @@ class TransactionServiceTest {
         // Act: Post transaction
         Transaction result = transactionService.postTransaction(
                 cardNumber, transactionAmount, merchantName, 
-                transactionTypeCode, transactionCategoryCode, transactionDate);
+                transactionTypeCode, transactionCategoryCode, transactionDate,
+                "Test merchandise purchase");
 
         // Assert: Verify transaction created
         assertNotNull(result, "Posted transaction should not be null");
@@ -410,7 +411,7 @@ class TransactionServiceTest {
         // Verify all repository interactions in correct order
         verify(cardXrefRepository, times(1)).findByCardNumber(cardNumber);
         verify(accountRepository, times(1)).findByIdWithLock(1L);
-        verify(accountService, times(1)).validateCreditLimit(testAccount, transactionAmount);
+        verify(accountService, times(1)).validateCreditLimit(eq(testAccount), any(BigDecimal.class));
         verify(transactionRepository, times(1)).save(any(Transaction.class));
         verify(accountRepository, times(1)).save(any(Account.class));
         verify(transactionCategoryBalanceRepository, times(1)).findById(any(TransactionCategoryBalanceId.class));
@@ -432,7 +433,8 @@ class TransactionServiceTest {
         InvalidInputException exception = assertThrows(InvalidInputException.class, () -> {
             transactionService.postTransaction(
                     cardNumber, zeroAmount, merchantName, 
-                    transactionTypeCode, transactionCategoryCode, transactionDate);
+                    transactionTypeCode, transactionCategoryCode, transactionDate,
+                    "Test transaction with zero amount");
         });
 
         assertEquals("Transaction amount must be non-zero", exception.getMessage());
@@ -457,7 +459,8 @@ class TransactionServiceTest {
         InvalidInputException exception = assertThrows(InvalidInputException.class, () -> {
             transactionService.postTransaction(
                     cardNumber, nullAmount, merchantName, 
-                    transactionTypeCode, transactionCategoryCode, transactionDate);
+                    transactionTypeCode, transactionCategoryCode, transactionDate,
+                    "Test transaction with null amount");
         });
 
         assertEquals("Transaction amount must be non-zero", exception.getMessage());
@@ -482,7 +485,8 @@ class TransactionServiceTest {
         InvalidInputException exception = assertThrows(InvalidInputException.class, () -> {
             transactionService.postTransaction(
                     cardNumber, transactionAmount, merchantName, 
-                    transactionTypeCode, transactionCategoryCode, futureDate);
+                    transactionTypeCode, transactionCategoryCode, futureDate,
+                    "Test transaction with future date");
         });
 
         assertEquals("Transaction date cannot be in the future", exception.getMessage());
@@ -509,7 +513,8 @@ class TransactionServiceTest {
         InvalidInputException exception = assertThrows(InvalidInputException.class, () -> {
             transactionService.postTransaction(
                     invalidCardNumber, transactionAmount, merchantName, 
-                    transactionTypeCode, transactionCategoryCode, transactionDate);
+                    transactionTypeCode, transactionCategoryCode, transactionDate,
+                    "Test transaction with invalid card");
         });
 
         assertTrue(exception.getMessage().contains("Card number not found"));
@@ -538,7 +543,8 @@ class TransactionServiceTest {
         ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, () -> {
             transactionService.postTransaction(
                     cardNumber, transactionAmount, merchantName, 
-                    transactionTypeCode, transactionCategoryCode, transactionDate);
+                    transactionTypeCode, transactionCategoryCode, transactionDate,
+                    "Test transaction with missing account");
         });
 
         assertEquals("Account not found with ID: 1", exception.getMessage());
@@ -563,13 +569,14 @@ class TransactionServiceTest {
         when(cardXrefRepository.findByCardNumber(cardNumber)).thenReturn(Optional.of(testCardXref));
         when(accountRepository.findByIdWithLock(1L)).thenReturn(Optional.of(testAccount));
         doThrow(new InsufficientFundsException(largeAmount, testAccount.getCurrentBalance(), testAccount.getCreditLimit()))
-                .when(accountService).validateCreditLimit(testAccount, largeAmount);
+                .when(accountService).validateCreditLimit(eq(testAccount), any(BigDecimal.class));
 
         // Act & Assert: Verify exception thrown for credit limit violation
         InsufficientFundsException exception = assertThrows(InsufficientFundsException.class, () -> {
             transactionService.postTransaction(
                     cardNumber, largeAmount, merchantName, 
-                    transactionTypeCode, transactionCategoryCode, transactionDate);
+                    transactionTypeCode, transactionCategoryCode, transactionDate,
+                    "Test transaction exceeding credit limit");
         });
 
         assertTrue(exception.getMessage().contains("exceeds available credit"));
@@ -577,7 +584,7 @@ class TransactionServiceTest {
         // Verify validation occurred but no transaction saved
         verify(cardXrefRepository, times(1)).findByCardNumber(cardNumber);
         verify(accountRepository, times(1)).findByIdWithLock(1L);
-        verify(accountService, times(1)).validateCreditLimit(testAccount, largeAmount);
+        verify(accountService, times(1)).validateCreditLimit(eq(testAccount), any(BigDecimal.class));
         verify(transactionRepository, never()).save(any(Transaction.class));
     }
 
@@ -597,7 +604,7 @@ class TransactionServiceTest {
 
         when(cardXrefRepository.findByCardNumber(cardNumber)).thenReturn(Optional.of(testCardXref));
         when(accountRepository.findByIdWithLock(1L)).thenReturn(Optional.of(testAccount));
-        doNothing().when(accountService).validateCreditLimit(testAccount, transactionAmount);
+        doNothing().when(accountService).validateCreditLimit(eq(testAccount), any(BigDecimal.class));
         when(transactionRepository.save(any(Transaction.class))).thenReturn(testTransaction);
         when(accountRepository.save(any(Account.class))).thenAnswer(invocation -> {
             Account savedAccount = invocation.getArgument(0);
@@ -616,7 +623,8 @@ class TransactionServiceTest {
         // Act: Post transaction
         transactionService.postTransaction(
                 cardNumber, transactionAmount, merchantName, 
-                transactionTypeCode, transactionCategoryCode, transactionDate);
+                transactionTypeCode, transactionCategoryCode, transactionDate,
+                "Test BigDecimal precision");
 
         // Assert: Verify account was saved with updated balance
         verify(accountRepository, times(1)).save(argThat(account -> 
@@ -639,7 +647,7 @@ class TransactionServiceTest {
 
         when(cardXrefRepository.findByCardNumber(cardNumber)).thenReturn(Optional.of(testCardXref));
         when(accountRepository.findByIdWithLock(1L)).thenReturn(Optional.of(testAccount));
-        doNothing().when(accountService).validateCreditLimit(testAccount, transactionAmount);
+        doNothing().when(accountService).validateCreditLimit(eq(testAccount), any(BigDecimal.class));
         when(transactionRepository.save(any(Transaction.class))).thenReturn(testTransaction);
         when(accountRepository.save(any(Account.class))).thenReturn(testAccount);
 
@@ -658,7 +666,8 @@ class TransactionServiceTest {
         // Act: Post transaction
         transactionService.postTransaction(
                 cardNumber, transactionAmount, merchantName, 
-                transactionTypeCode, transactionCategoryCode, transactionDate);
+                transactionTypeCode, transactionCategoryCode, transactionDate,
+                "Test category balance update");
 
         // Assert: Verify category balance was saved with updated amount
         verify(transactionCategoryBalanceRepository, times(1)).save(argThat(balance ->
@@ -677,7 +686,7 @@ class TransactionServiceTest {
 
         when(cardXrefRepository.findByCardNumber(cardNumber)).thenReturn(Optional.of(testCardXref));
         when(accountRepository.findByIdWithLock(1L)).thenReturn(Optional.of(testAccount));
-        doNothing().when(accountService).validateCreditLimit(testAccount, transactionAmount);
+        doNothing().when(accountService).validateCreditLimit(eq(testAccount), any(BigDecimal.class));
         when(transactionRepository.save(any(Transaction.class))).thenReturn(testTransaction);
         when(accountRepository.save(any(Account.class))).thenReturn(testAccount);
 
@@ -691,7 +700,8 @@ class TransactionServiceTest {
         // Act: Post transaction
         transactionService.postTransaction(
                 cardNumber, transactionAmount, merchantName, 
-                transactionTypeCode, transactionCategoryCode, null);
+                transactionTypeCode, transactionCategoryCode, null,
+                "Test new category balance creation");
 
         // Assert: Verify new category balance was created with initial amount
         verify(transactionCategoryBalanceRepository, times(1)).save(argThat(balance ->
@@ -716,7 +726,7 @@ class TransactionServiceTest {
 
         when(cardXrefRepository.findByCardNumber(cardNumber)).thenReturn(Optional.of(testCardXref));
         when(accountRepository.findByIdWithLock(1L)).thenReturn(Optional.of(testAccount));
-        doNothing().when(accountService).validateCreditLimit(testAccount, transactionAmount);
+        doNothing().when(accountService).validateCreditLimit(eq(testAccount), any(BigDecimal.class));
         when(transactionRepository.save(any(Transaction.class))).thenReturn(testTransaction);
         when(accountRepository.save(any(Account.class))).thenAnswer(invocation -> {
             Account savedAccount = invocation.getArgument(0);
@@ -735,7 +745,8 @@ class TransactionServiceTest {
         // Act: Post transaction
         transactionService.postTransaction(
                 cardNumber, transactionAmount, merchantName, 
-                transactionTypeCode, transactionCategoryCode, null);
+                transactionTypeCode, transactionCategoryCode, null,
+                "Test cycle credit update");
 
         // Assert: Verify cycle credit updated
         verify(accountRepository, times(1)).save(argThat(account ->
