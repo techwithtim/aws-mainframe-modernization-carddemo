@@ -646,14 +646,47 @@ COMMENT ON COLUMN app_user.account_locked IS 'Account lock status. TRUE = locked
 COMMENT ON COLUMN app_user.failed_login_attempts IS 'Failed login counter for brute-force protection. Reset to 0 on successful login. Locks account after 5 consecutive failures.';
 
 -- ================================================================
+-- Table: interest_calculation_log
+-- Purpose: Audit log for monthly interest calculation batch job execution
+-- Business Function: Tracks interest posting runs with summary statistics
+-- COBOL Equivalent: N/A (new audit capability for batch job monitoring)
+-- ================================================================
+CREATE TABLE interest_calculation_log (
+    log_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    processing_date DATE NOT NULL,
+    total_accounts_processed INTEGER NOT NULL CHECK (total_accounts_processed >= 0),
+    total_interest_charged NUMERIC(15,2) NOT NULL CHECK (total_interest_charged >= 0),
+    average_interest NUMERIC(15,2) NOT NULL CHECK (average_interest >= 0),
+    min_interest NUMERIC(15,2) NOT NULL CHECK (min_interest >= 0),
+    max_interest NUMERIC(15,2) NOT NULL CHECK (max_interest >= 0),
+    processing_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Index on processing_date for date range queries and reconciliation reports
+CREATE INDEX idx_interest_log_date ON interest_calculation_log(processing_date DESC);
+
+-- Index on processing_timestamp for chronological queries
+CREATE INDEX idx_interest_log_timestamp ON interest_calculation_log(processing_timestamp DESC);
+
+COMMENT ON TABLE interest_calculation_log IS 'Audit log for interest calculation batch job runs. Captures summary statistics for reconciliation, reporting, and operational monitoring. Enables tracking of interest posting execution over time.';
+COMMENT ON COLUMN interest_calculation_log.processing_date IS 'Business date for which interest was calculated (typically month-end). Used for monthly reconciliation reports.';
+COMMENT ON COLUMN interest_calculation_log.total_accounts_processed IS 'Number of accounts charged interest in this batch run. Matches count of interest transaction records created.';
+COMMENT ON COLUMN interest_calculation_log.total_interest_charged IS 'Sum of all interest charges posted in this batch run. Should reconcile with sum of interest transaction amounts.';
+COMMENT ON COLUMN interest_calculation_log.average_interest IS 'Mean interest amount per account. Calculated as total_interest_charged / total_accounts_processed.';
+COMMENT ON COLUMN interest_calculation_log.min_interest IS 'Minimum interest charge in this batch run. Useful for identifying accounts with low balances.';
+COMMENT ON COLUMN interest_calculation_log.max_interest IS 'Maximum interest charge in this batch run. Useful for identifying high-balance accounts or potential data anomalies.';
+COMMENT ON COLUMN interest_calculation_log.processing_timestamp IS 'Timestamp when batch job completed. Used for operational monitoring and performance tracking.';
+
+-- ================================================================
 -- End of V1__create_tables.sql
 -- ================================================================
 
 -- Summary:
--- - 11 tables created from 12 COBOL copybooks (CVCUS01Y + CUSTREC merged)
+-- - 12 tables created: 11 from COBOL copybooks + 1 audit table (interest_calculation_log)
+-- - CVCUS01Y + CUSTREC merged into single customer table
 -- - All monetary fields use NUMERIC for exact decimal precision
 -- - All sensitive PII fields marked for encryption-at-rest
--- - All tables include audit columns (created_at, updated_at, version)
+-- - All business tables include audit columns (created_at, updated_at, version)
 -- - All tables use BIGINT GENERATED ALWAYS AS IDENTITY primary keys
 -- - All foreign key relationships enforce referential integrity
 -- - All business rule constraints enforced via CHECK constraints
@@ -662,8 +695,9 @@ COMMENT ON COLUMN app_user.failed_login_attempts IS 'Failed login counter for br
 -- - Password storage upgraded from plain-text to BCrypt hashing
 -- - Processing status tracking added to daily_transaction for batch jobs
 -- - Security fields added to app_user for modern authentication requirements
+-- - Batch job audit logging added via interest_calculation_log table
 -- 
--- Total DDL statements: 11 CREATE TABLE, 47 CREATE INDEX, 40+ COMMENT ON
+-- Total DDL statements: 12 CREATE TABLE, 49 CREATE INDEX, 48 COMMENT ON
 -- Expected row counts (from test data):
 --   - customer: 50 records
 --   - account: 50 records

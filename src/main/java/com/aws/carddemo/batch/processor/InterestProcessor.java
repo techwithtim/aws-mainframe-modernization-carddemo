@@ -11,6 +11,8 @@ import com.aws.carddemo.model.DisclosureGroup;
 import com.aws.carddemo.repository.DisclosureGroupRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.batch.core.StepExecution;
+import org.springframework.batch.core.annotation.BeforeStep;
 import org.springframework.batch.item.ItemProcessor;
 import org.springframework.stereotype.Component;
 
@@ -103,12 +105,42 @@ public class InterestProcessor implements ItemProcessor<Account, InterestTransac
     private final DisclosureGroupRepository disclosureGroupRepository;
 
     /**
+     * Processing date for interest calculation, extracted from runDate job parameter.
+     * Initialized via @BeforeStep from job execution context. Defaults to current date
+     * if runDate parameter is not provided, ensuring backward compatibility.
+     */
+    private LocalDate processingDate;
+
+    /**
      * Constructs InterestProcessor with required repository dependency.
      *
      * @param disclosureGroupRepository Spring Data JPA repository for disclosure group lookups
      */
     public InterestProcessor(DisclosureGroupRepository disclosureGroupRepository) {
         this.disclosureGroupRepository = disclosureGroupRepository;
+    }
+
+    /**
+     * Initializes processing date from job parameters before step execution.
+     * Extracts runDate parameter from JobParameters and sets processingDate field.
+     * If runDate parameter is not present, defaults to current date for backward compatibility.
+     * <p>
+     * This method is invoked by Spring Batch framework before step execution begins,
+     * ensuring processor has access to job parameter values during process() invocations.
+     * </p>
+     *
+     * @param stepExecution Spring Batch StepExecution providing access to job parameters
+     */
+    @BeforeStep
+    public void beforeStep(StepExecution stepExecution) {
+        String runDateString = stepExecution.getJobParameters().getString("runDate");
+        if (runDateString != null && !runDateString.trim().isEmpty()) {
+            this.processingDate = LocalDate.parse(runDateString);
+            logger.info("Initialized processingDate from runDate parameter: {}", this.processingDate);
+        } else {
+            this.processingDate = LocalDate.now();
+            logger.warn("runDate parameter not provided, defaulting to current date: {}", this.processingDate);
+        }
     }
 
     /**
@@ -141,6 +173,14 @@ public class InterestProcessor implements ItemProcessor<Account, InterestTransac
     public InterestTransaction process(Account account) throws Exception {
         long startTime = System.currentTimeMillis();
 
+        // Initialize processingDate if not set (for unit tests or direct invocation)
+        // In production batch jobs, this will be set via @BeforeStep from job parameters
+        if (processingDate == null) {
+            processingDate = LocalDate.now();
+            logger.debug("processingDate not initialized via @BeforeStep, defaulting to current date: {}", 
+                processingDate);
+        }
+
         try {
             // Step 1: Zero Balance Handling - Filter accounts with zero or negative balance
             // Replicates COBOL implicit filtering where interest is only calculated for positive balances
@@ -172,10 +212,13 @@ public class InterestProcessor implements ItemProcessor<Account, InterestTransac
 
             // Step 6: Interest Transaction Creation
             // Build DTO for downstream AccountWriter to persist
+            // Use processingDate from job parameters (extracted via @BeforeStep) to ensure
+            // consistent transaction dates across job executions and prevent duplicate
+            // transaction_number constraint violations when job is run multiple times
             InterestTransaction interestTransaction = new InterestTransaction(
                 account.getAccountId(),
                 finalInterest,
-                LocalDate.now().withDayOfMonth(1), // First day of current month
+                processingDate.withDayOfMonth(1), // First day of processing month
                 yearToDateInterest
             );
 

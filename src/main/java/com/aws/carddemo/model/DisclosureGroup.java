@@ -247,7 +247,7 @@ public class DisclosureGroup implements Serializable {
      * @see #transactionType
      */
     @Id
-    @Column(name = "transaction_type_code", length = 2, nullable = false)
+    @Column(name = "type_code", length = 2, nullable = false)
     @NotBlank(message = "Transaction type code cannot be blank")
     @Size(max = 2, message = "Transaction type code cannot exceed 2 characters")
     @EqualsAndHashCode.Include
@@ -290,7 +290,7 @@ public class DisclosureGroup implements Serializable {
      * @see #transactionCategory
      */
     @Id
-    @Column(name = "transaction_category_code", length = 4, nullable = false)
+    @Column(name = "category_code", length = 4, nullable = false)
     @NotBlank(message = "Transaction category code cannot be blank")
     @Size(max = 4, message = "Transaction category code cannot exceed 4 characters")
     @EqualsAndHashCode.Include
@@ -421,7 +421,7 @@ public class DisclosureGroup implements Serializable {
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(
-        name = "transaction_type_code",
+        name = "type_code",
         referencedColumnName = "type_code",
         insertable = false,
         updatable = false,
@@ -498,13 +498,13 @@ public class DisclosureGroup implements Serializable {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumns({
         @JoinColumn(
-            name = "transaction_type_code",
-            referencedColumnName = "transaction_type_code",
+            name = "type_code",
+            referencedColumnName = "type_code",
             insertable = false,
             updatable = false
         ),
         @JoinColumn(
-            name = "transaction_category_code",
+            name = "category_code",
             referencedColumnName = "category_code",
             insertable = false,
             updatable = false

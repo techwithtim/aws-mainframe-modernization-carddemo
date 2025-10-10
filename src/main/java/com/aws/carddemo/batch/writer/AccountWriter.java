@@ -16,8 +16,10 @@ package com.aws.carddemo.batch.writer;
 
 import com.aws.carddemo.batch.dto.InterestTransaction;
 import com.aws.carddemo.model.Account;
+import com.aws.carddemo.model.CardXref;
 import com.aws.carddemo.model.Transaction;
 import com.aws.carddemo.repository.AccountRepository;
+import com.aws.carddemo.repository.CardXrefRepository;
 import com.aws.carddemo.repository.TransactionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -235,6 +237,7 @@ public class AccountWriter implements ItemWriter<InterestTransaction> {
     // Injected dependencies (immutable for thread safety)
     private final TransactionRepository transactionRepository;
     private final AccountRepository accountRepository;
+    private final CardXrefRepository cardXrefRepository;
     private final JdbcTemplate jdbcTemplate;
     
     /**
@@ -246,14 +249,17 @@ public class AccountWriter implements ItemWriter<InterestTransaction> {
      * 
      * @param transactionRepository repository for batch inserting interest charge transactions
      * @param accountRepository repository for updating account balances and YTD interest
+     * @param cardXrefRepository repository for looking up card numbers associated with accounts
      * @param jdbcTemplate JDBC template for direct SQL audit log inserts
      */
     public AccountWriter(
             TransactionRepository transactionRepository,
             AccountRepository accountRepository,
+            CardXrefRepository cardXrefRepository,
             JdbcTemplate jdbcTemplate) {
         this.transactionRepository = transactionRepository;
         this.accountRepository = accountRepository;
+        this.cardXrefRepository = cardXrefRepository;
         this.jdbcTemplate = jdbcTemplate;
     }
     
@@ -436,6 +442,9 @@ public class AccountWriter implements ItemWriter<InterestTransaction> {
                 interestTxn.getAccountId(),
                 interestTxn.getTransactionDate());
             
+            // Lookup card number for this account (required by transaction.card_number NOT NULL constraint)
+            String cardNumber = lookupCardNumber(interestTxn.getAccountId());
+            
             // Build transaction entity matching COBOL TRAN-RECORD structure
             Transaction transaction = Transaction.builder()
                 .transactionNumber(transactionNumber)
@@ -449,7 +458,7 @@ public class AccountWriter implements ItemWriter<InterestTransaction> {
                 .merchantName(null)
                 .merchantCity(null)
                 .merchantZip(null)
-                .cardNumber(null)  // No card association for interest charges
+                .cardNumber(cardNumber)  // Card number from account lookup (replaces hardcoded placeholder)
                 .originalTimestamp(processingTimestamp)  // TRAN-ORIG-TS
                 .processingTimestamp(processingTimestamp)  // TRAN-PROC-TS
                 .build();
@@ -632,5 +641,61 @@ public class AccountWriter implements ItemWriter<InterestTransaction> {
         // Format: INT-YYYYMMDD-accountId
         String dateString = transactionDate.toString().replace("-", "");
         return String.format("INT-%s-%d", dateString, accountId);
+    }
+    
+    /**
+     * Looks up the card number associated with an account for transaction creation.
+     * 
+     * <p>Replaces COBOL CBACT04C.cbl pattern where TRAN-CARD-NUM is populated from
+     * XREF-CARD-NUM after cross-reference file lookup. This method uses
+     * {@link CardXrefRepository#findByAccountId(Long)} to fetch the card number
+     * associated with the account.
+     * 
+     * <p><strong>COBOL Mapping:</strong></p>
+     * <pre>
+     * READ XREFFILE INTO CARD-XREF-RECORD
+     *   KEY IS XREF-ACCT-ID
+     * IF FILE-STATUS = '00'
+     *   MOVE XREF-CARD-NUM TO TRAN-CARD-NUM
+     * END-IF
+     * </pre>
+     * 
+     * <p><strong>Business Rule:</strong></p>
+     * <p>If multiple cards exist for an account, the first card is selected (primary card pattern).
+     * This matches the payment service behavior from {@link com.aws.carddemo.service.PaymentService#lookupCardNumber(Long)}.
+     * 
+     * <p><strong>Error Handling:</strong></p>
+     * <p>If no card exists for the account, this method throws {@link IllegalStateException}
+     * to fail the batch job and alert operations that test data is incomplete. In production,
+     * every active account should have at least one associated card.
+     * 
+     * @param accountId the account ID to lookup card number for
+     * @return the card number (16-digit string) associated with the account
+     * @throws IllegalStateException if no card found for account (indicates data integrity issue)
+     */
+    private String lookupCardNumber(Long accountId) {
+        List<CardXref> cardXrefs = cardXrefRepository.findByAccountId(accountId);
+        
+        if (cardXrefs.isEmpty()) {
+            // CRITICAL: Interest transactions require valid card numbers (NOT NULL constraint)
+            // If no card exists, this indicates test data setup issue or data integrity problem
+            String errorMsg = String.format(
+                "No card found for account ID %d. Interest transaction requires valid card_number " +
+                "(NOT NULL constraint). Verify CardXref records exist for all test accounts.", 
+                accountId);
+            logger.error(errorMsg);
+            throw new IllegalStateException(errorMsg);
+        }
+        
+        // Use first card if multiple cards exist (primary card pattern)
+        CardXref primaryCard = cardXrefs.get(0);
+        String cardNumber = primaryCard.getCardNumber();
+        
+        // Log with masked card number per PCI-DSS (mask middle digits, show first 4 and last 4)
+        String maskedCardNumber = cardNumber.substring(0, 4) + "********" + cardNumber.substring(12);
+        logger.debug("Card number found for account: AccountId={}, MaskedCard={}", 
+                accountId, maskedCardNumber);
+        
+        return cardNumber;
     }
 }

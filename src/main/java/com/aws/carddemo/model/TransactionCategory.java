@@ -128,8 +128,8 @@ public class TransactionCategory implements Serializable {
      * 
      * <p><b>Database Mapping:</b></p>
      * <ul>
-     *   <li>Column: transaction_type_code VARCHAR(2) NOT NULL</li>
-     *   <li>Primary Key: Part 1 of composite PRIMARY KEY (transaction_type_code, category_code)</li>
+     *   <li>Column: type_code VARCHAR(2) NOT NULL (FIXED: corrected from transaction_type_code)</li>
+     *   <li>Primary Key: Part 1 of composite PRIMARY KEY (type_code, category_code)</li>
      *   <li>Foreign Key: REFERENCES transaction_type(type_code)</li>
      *   <li>Index: idx_category_type for foreign key lookups</li>
      * </ul>
@@ -145,7 +145,7 @@ public class TransactionCategory implements Serializable {
      * @see TransactionType#typeCode
      */
     @Id
-    @Column(name = "transaction_type_code", length = 2, nullable = false)
+    @Column(name = "type_code", length = 2, nullable = false)
     @NotBlank(message = "Transaction type code cannot be blank")
     @Pattern(regexp = "\\d{2}", message = "Transaction type code must be a 2-digit numeric string (e.g., '01', '07')")
     @EqualsAndHashCode.Include
@@ -262,7 +262,7 @@ public class TransactionCategory implements Serializable {
      * @see #transactionTypeCode
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "transaction_type_code", referencedColumnName = "type_code", insertable = false, updatable = false)
+    @JoinColumn(name = "type_code", referencedColumnName = "type_code", insertable = false, updatable = false)
     private TransactionType transactionType;
 
     /**

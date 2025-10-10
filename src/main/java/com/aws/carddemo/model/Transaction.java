@@ -258,7 +258,7 @@ public class Transaction extends BaseEntity implements Serializable {
      * 
      * @return the transaction type code, never null
      */
-    @Column(name = "transaction_type_code", nullable = false, length = 2)
+    @Column(name = "type_code", nullable = false, length = 2)
     @NotBlank(message = "Transaction type code is required")
     @Size(min = 2, max = 2, message = "Transaction type code must be exactly 2 characters")
     private String transactionTypeCode;
@@ -277,7 +277,7 @@ public class Transaction extends BaseEntity implements Serializable {
      * 
      * @return the transaction category code, never null
      */
-    @Column(name = "transaction_category_code", nullable = false, length = 4)
+    @Column(name = "category_code", nullable = false, length = 4)
     @NotBlank(message = "Transaction category code is required")
     @Size(min = 4, max = 4, message = "Transaction category code must be exactly 4 characters")
     private String transactionCategoryCode;
