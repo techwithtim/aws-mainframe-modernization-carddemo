@@ -653,7 +653,7 @@ public class TransactionControllerTest {
         
         // Stub service method (COBOL EXEC CICS WRITE FILE('TRANFILE'))
         when(transactionService.postTransaction(
-                anyString(), any(BigDecimal.class), anyString(), anyString(), anyString(), any(LocalDate.class)))
+                anyString(), any(BigDecimal.class), anyString(), anyString(), anyString(), any(LocalDate.class), anyString()))
                 .thenReturn(createdTransaction);
         when(transactionMapper.toResponse(any(Transaction.class)))
                 .thenReturn(mockResponse);
@@ -679,7 +679,7 @@ public class TransactionControllerTest {
         
         // Verify service method called with correct parameters
         verify(transactionService, times(1)).postTransaction(
-                anyString(), any(BigDecimal.class), anyString(), anyString(), anyString(), any(LocalDate.class));
+                anyString(), any(BigDecimal.class), anyString(), anyString(), anyString(), any(LocalDate.class), anyString());
     }
 
     /**
@@ -724,7 +724,7 @@ public class TransactionControllerTest {
         
         // Verify service method was NOT called (validation failed before service invocation)
         verify(transactionService, never()).postTransaction(
-                anyString(), any(BigDecimal.class), anyString(), anyString(), anyString(), any(LocalDate.class));
+                anyString(), any(BigDecimal.class), anyString(), anyString(), anyString(), any(LocalDate.class), anyString());
     }
 
     /**
@@ -753,7 +753,7 @@ public class TransactionControllerTest {
         
         // Stub service to throw InsufficientFundsException (COBOL balance check failure)
         when(transactionService.postTransaction(
-                anyString(), any(BigDecimal.class), anyString(), anyString(), anyString(), any(LocalDate.class)))
+                anyString(), any(BigDecimal.class), anyString(), anyString(), anyString(), any(LocalDate.class), anyString()))
                 .thenThrow(new InsufficientFundsException(
                         new BigDecimal("10000.00"),  // requestedAmount
                         new BigDecimal("5000.00"),   // availableBalance
@@ -768,7 +768,7 @@ public class TransactionControllerTest {
                 .andExpect(status().isUnprocessableEntity());
         
         verify(transactionService, times(1)).postTransaction(
-                anyString(), any(BigDecimal.class), anyString(), anyString(), anyString(), any(LocalDate.class));
+                anyString(), any(BigDecimal.class), anyString(), anyString(), anyString(), any(LocalDate.class), anyString());
     }
 
     /**
@@ -798,7 +798,7 @@ public class TransactionControllerTest {
         
         // Stub service to throw InvalidInputException (COBOL TRNTYPE file not found)
         when(transactionService.postTransaction(
-                anyString(), any(BigDecimal.class), anyString(), anyString(), anyString(), any(LocalDate.class)))
+                anyString(), any(BigDecimal.class), anyString(), anyString(), anyString(), any(LocalDate.class), anyString()))
                 .thenThrow(new InvalidInputException("Invalid transaction type: 99"));
         
         // ACT & ASSERT: Verify 400 BAD REQUEST response (GlobalExceptionHandler maps InvalidInputException to 400)
@@ -809,7 +809,7 @@ public class TransactionControllerTest {
                 .andExpect(status().isBadRequest());
         
         verify(transactionService, times(1)).postTransaction(
-                anyString(), any(BigDecimal.class), anyString(), anyString(), anyString(), any(LocalDate.class));
+                anyString(), any(BigDecimal.class), anyString(), anyString(), anyString(), any(LocalDate.class), anyString());
     }
 
     /**
@@ -859,7 +859,7 @@ public class TransactionControllerTest {
                 .build();
         
         when(transactionService.postTransaction(
-                anyString(), any(BigDecimal.class), anyString(), eq(typeCode), anyString(), any(LocalDate.class)))
+                anyString(), any(BigDecimal.class), anyString(), eq(typeCode), anyString(), any(LocalDate.class), anyString()))
                 .thenReturn(createdTransaction);
         when(transactionMapper.toResponse(any(Transaction.class)))
                 .thenReturn(mockResponse);
@@ -873,7 +873,7 @@ public class TransactionControllerTest {
                 .andExpect(jsonPath("$.transaction_type_code", is(typeCode)));
         
         verify(transactionService, times(1)).postTransaction(
-                anyString(), any(BigDecimal.class), anyString(), eq(typeCode), anyString(), any(LocalDate.class));
+                anyString(), any(BigDecimal.class), anyString(), eq(typeCode), anyString(), any(LocalDate.class), anyString());
     }
 
     // ========================================
