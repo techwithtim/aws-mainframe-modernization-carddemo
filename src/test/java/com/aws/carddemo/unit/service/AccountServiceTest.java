@@ -214,8 +214,8 @@ class AccountServiceTest {
     @Test
     @DisplayName("getAccountById - Success: Returns account by primary key")
     void testGetAccountById_Success() {
-        // Given: Repository returns account by ID
-        when(accountRepository.findById(TEST_ACCOUNT_ID))
+        // Given: Repository returns account by ID with customer eagerly loaded
+        when(accountRepository.findByIdWithCustomer(TEST_ACCOUNT_ID))
                 .thenReturn(Optional.of(testAccount));
 
         // When: Service method is called with account ID
@@ -227,14 +227,14 @@ class AccountServiceTest {
         assertEquals(TEST_ACCOUNT_NUMBER, result.getAccountNumber());
 
         // Verify repository interaction
-        verify(accountRepository, times(1)).findById(TEST_ACCOUNT_ID);
+        verify(accountRepository, times(1)).findByIdWithCustomer(TEST_ACCOUNT_ID);
     }
 
     @Test
     @DisplayName("getAccountById - Account Not Found: Throws ResourceNotFoundException")
     void testGetAccountById_NotFound() {
         // Given: Repository returns empty Optional
-        when(accountRepository.findById(TEST_ACCOUNT_ID))
+        when(accountRepository.findByIdWithCustomer(TEST_ACCOUNT_ID))
                 .thenReturn(Optional.empty());
 
         // When/Then: Exception is thrown
@@ -244,7 +244,7 @@ class AccountServiceTest {
         );
 
         assertTrue(exception.getMessage().contains("not found"));
-        verify(accountRepository, times(1)).findById(TEST_ACCOUNT_ID);
+        verify(accountRepository, times(1)).findByIdWithCustomer(TEST_ACCOUNT_ID);
     }
 
     @Test
@@ -257,7 +257,7 @@ class AccountServiceTest {
         );
 
         assertEquals("Account ID cannot be null", exception.getMessage());
-        verify(accountRepository, never()).findById(anyLong());
+        verify(accountRepository, never()).findByIdWithCustomer(anyLong());
     }
 
     // ==================== updateAccountBalance() Tests ====================
@@ -442,7 +442,7 @@ class AccountServiceTest {
         updateRequest.setAccountStatus(INACTIVE_STATUS);
         updateRequest.setCreditLimit(new BigDecimal("6000.00"));
 
-        when(accountRepository.findByIdWithLock(TEST_ACCOUNT_ID))
+        when(accountRepository.findByIdWithLockAndCustomer(TEST_ACCOUNT_ID))
                 .thenReturn(Optional.of(testAccount));
         doNothing().when(accountMapper).updateEntityFromRequest(updateRequest, testAccount);
         when(accountRepository.save(any(Account.class)))
@@ -453,7 +453,7 @@ class AccountServiceTest {
 
         // Then: Update is successful
         assertNotNull(result);
-        verify(accountRepository).findByIdWithLock(TEST_ACCOUNT_ID);
+        verify(accountRepository).findByIdWithLockAndCustomer(TEST_ACCOUNT_ID);
         verify(accountMapper).updateEntityFromRequest(updateRequest, testAccount);
         verify(accountRepository).save(any(Account.class));
     }
@@ -467,7 +467,7 @@ class AccountServiceTest {
 
         when(accountRepository.findByAccountNumber(TEST_ACCOUNT_NUMBER))
                 .thenReturn(Optional.of(testAccount));
-        when(accountRepository.findByIdWithLock(TEST_ACCOUNT_ID))
+        when(accountRepository.findByIdWithLockAndCustomer(TEST_ACCOUNT_ID))
                 .thenReturn(Optional.of(testAccount));
         doNothing().when(accountMapper).updateEntityFromRequest(updateRequest, testAccount);
         when(accountRepository.save(any(Account.class)))
@@ -479,7 +479,7 @@ class AccountServiceTest {
         // Then: Update is successful
         assertNotNull(result);
         verify(accountRepository).findByAccountNumber(TEST_ACCOUNT_NUMBER);
-        verify(accountRepository).findByIdWithLock(TEST_ACCOUNT_ID);
+        verify(accountRepository).findByIdWithLockAndCustomer(TEST_ACCOUNT_ID);
         verify(accountRepository).save(any(Account.class));
     }
 
@@ -502,7 +502,7 @@ class AccountServiceTest {
                 .zipCode("75001")
                 .build();
 
-        when(accountRepository.findByIdWithLock(TEST_ACCOUNT_ID))
+        when(accountRepository.findByIdWithLockAndCustomer(TEST_ACCOUNT_ID))
                 .thenReturn(Optional.of(testAccount));
         doAnswer(invocation -> {
             AccountUpdateRequest request = invocation.getArgument(0);
@@ -554,7 +554,7 @@ class AccountServiceTest {
     void testUpdateAccount_NotFound() {
         // Given: Account does not exist
         AccountUpdateRequest updateRequest = new AccountUpdateRequest();
-        when(accountRepository.findByIdWithLock(TEST_ACCOUNT_ID))
+        when(accountRepository.findByIdWithLockAndCustomer(TEST_ACCOUNT_ID))
                 .thenReturn(Optional.empty());
 
         // When/Then: ResourceNotFoundException is thrown
