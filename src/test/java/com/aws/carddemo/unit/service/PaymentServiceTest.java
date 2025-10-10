@@ -452,7 +452,7 @@ class PaymentServiceTest {
      * cannot have negative balances representing overpayment credits in this system).
      */
     @Test
-    @DisplayName("Throw InvalidInputException when payment exceeds current balance")
+    @DisplayName("Throw InsufficientFundsException when payment exceeds current balance")
     void testProcessPayment_OverpaymentAttempt() {
         // Arrange: Account with $1000.00 balance
         when(accountRepository.findById(TEST_ACCOUNT_ID)).thenReturn(Optional.of(testAccount));
@@ -467,10 +467,10 @@ class PaymentServiceTest {
                 .confirmationFlag("Y")
                 .build();
         
-        InvalidInputException exception = assertThrows(
-                InvalidInputException.class,
+        InsufficientFundsException exception = assertThrows(
+                InsufficientFundsException.class,
                 () -> paymentService.processPayment(request),
-                "Should throw InvalidInputException when payment exceeds balance"
+                "Should throw InsufficientFundsException when payment exceeds balance (you don't owe that much)"
         );
         
         // Verify exception contains payment validation details
@@ -736,12 +736,13 @@ class PaymentServiceTest {
             assertEquals("POS TERM", savedTransaction.getTransactionSource(),
                     "Transaction source should be 'POS TERM' (PaymentService PAYMENT_SOURCE)");
             
-            // Verify amount is negative (credit) - payment reduces balance
-            assertTrue(savedTransaction.getAmount().compareTo(BigDecimal.ZERO) < 0,
-                    "Transaction amount should be negative for payment (credit to account)");
+            // Verify amount is positive (type code '02' indicates payment/credit)
+            // Service implementation stores amounts as positive with type code determining debit vs credit
+            assertTrue(savedTransaction.getAmount().compareTo(BigDecimal.ZERO) > 0,
+                    "Transaction amount should be positive (type code '02' indicates payment/credit)");
             
-            assertEquals(0, PAYMENT_AMOUNT.negate().compareTo(savedTransaction.getAmount()),
-                    "Transaction amount should be negative payment amount");
+            assertEquals(0, PAYMENT_AMOUNT.compareTo(savedTransaction.getAmount()),
+                    "Transaction amount should equal payment amount (positive)");
             
             // Verify description is set correctly
             assertNotNull(savedTransaction.getDescription());
