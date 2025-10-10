@@ -3,6 +3,7 @@ package com.aws.carddemo.unit.controller;
 import com.aws.carddemo.controller.AccountController;
 import com.aws.carddemo.dto.request.AccountUpdateRequest;
 import com.aws.carddemo.dto.response.AccountResponse;
+import com.aws.carddemo.exception.InvalidInputException;
 import com.aws.carddemo.mapper.AccountMapper;
 import com.aws.carddemo.model.Account;
 import com.aws.carddemo.service.AccountService;
@@ -24,6 +25,7 @@ import java.time.LocalDate;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -259,7 +261,7 @@ public class AccountControllerTest {
 
         // Initialize AccountUpdateRequest test fixture
         testUpdateRequest = AccountUpdateRequest.builder()
-                .accountStatus("A")  // "A" = Active (valid pattern: [ACS])
+                .accountStatus("Y")  // "Y" = Active (valid pattern: [YN])
                 .statusReason("Active Account")
                 .creditLimit(BigDecimal.valueOf(6000.00))
                 .cashCreditLimit(BigDecimal.valueOf(1200.00))
@@ -707,6 +709,11 @@ public class AccountControllerTest {
                 .zipCode("75001")
                 .build();
 
+        // Given: Mock service throws InvalidInputException for validation failure
+        when(accountService.updateAccount(eq(1L), any(AccountUpdateRequest.class)))
+                .thenThrow(new InvalidInputException("cashCreditLimit", 
+                        "Cash credit limit cannot exceed credit limit"));
+
         // When: PUT request with invalid credit/cash limit relationship
         mockMvc.perform(put("/api/v1/accounts/{id}", 1L)
                         .with(user("testuser").roles("USER"))
@@ -717,8 +724,7 @@ public class AccountControllerTest {
                 // Then: Verify 400 BAD REQUEST response
                 .andExpect(status().isBadRequest());
 
-        // Note: Validation may occur at service layer, so service may be called
-        // but should throw validation exception
+        // Note: Validation occurs at service layer, which throws validation exception
     }
 
     /**
@@ -756,6 +762,11 @@ public class AccountControllerTest {
                 .state("TX")
                 .zipCode("75001")
                 .build();
+
+        // Given: Mock service throws InvalidInputException for date validation failure
+        when(accountService.updateAccount(eq(1L), any(AccountUpdateRequest.class)))
+                .thenThrow(new InvalidInputException("accountExpirationDate", 
+                        "Account expiration date must be after account open date"));
 
         // When: PUT request with invalid date relationship
         mockMvc.perform(put("/api/v1/accounts/{id}", 1L)

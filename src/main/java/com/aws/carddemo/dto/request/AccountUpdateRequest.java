@@ -89,22 +89,23 @@ public class AccountUpdateRequest {
     // ========================================================================
 
     /**
-     * Account status code.
+     * Account active status indicator.
      * Maps to: ACSTTUS field (DFHMDF POS=(5,70) LENGTH=1 ATTRB=UNPROT)
      * COBOL source: ACCT-ACTIVE-STATUS PIC X(01) from CVACT01Y.cpy
      * 
-     * Valid values:
-     * - "A" = Active
-     * - "C" = Closed
-     * - "S" = Suspended
+     * Valid values (must match Account entity validation):
+     * - "Y" = Active (Yes)
+     * - "N" = Inactive/Closed (No)
      * 
      * Business rules:
-     * - Active can transition to Closed or Suspended
-     * - Closed cannot transition to other states (terminal state)
-     * - Suspended can transition to Active or Closed
+     * - Active ('Y') accounts can process transactions
+     * - Inactive ('N') accounts are closed and cannot process transactions
+     * 
+     * NOTE: This field maps directly to Account.activeStatus without conversion.
+     * The DTO validation must match the entity validation @Pattern(regexp = "[YN]").
      */
     @NotBlank(message = "Account status is required")
-    @Pattern(regexp = "[ACS]", message = "Account status must be 'A' (Active), 'C' (Closed), or 'S' (Suspended)")
+    @Pattern(regexp = "[YN]", message = "Account status must be 'Y' (Active) or 'N' (Inactive)")
     @JsonProperty("account_status")
     private String accountStatus;
 

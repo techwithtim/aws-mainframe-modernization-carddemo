@@ -246,7 +246,9 @@ public class AccountService {
             throw new IllegalArgumentException("Account ID cannot be null");
         }
         
-        Optional<Account> accountOpt = accountRepository.findById(accountId);
+        // Use findByIdWithCustomer to eagerly fetch customer data
+        // This prevents LazyInitializationException when AccountMapper accesses customer.getFirstName()
+        Optional<Account> accountOpt = accountRepository.findByIdWithCustomer(accountId);
         
         if (accountOpt.isEmpty()) {
             log.warn("Account not found for account ID: {}", accountId);
@@ -441,8 +443,8 @@ public class AccountService {
             throw new IllegalArgumentException("Account update request cannot be null");
         }
         
-        // Acquire pessimistic lock
-        Optional<Account> lockedAccountOpt = accountRepository.findByIdWithLock(accountId);
+        // Acquire pessimistic lock + eagerly load customer (prevents LazyInitializationException in mapper)
+        Optional<Account> lockedAccountOpt = accountRepository.findByIdWithLockAndCustomer(accountId);
         
         if (lockedAccountOpt.isEmpty()) {
             log.error("Account not found for ID: {}", accountId);

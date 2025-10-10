@@ -276,4 +276,139 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT a FROM Account a WHERE a.accountId = :id")
     Optional<Account> findByIdWithLock(@Param("id") Long id);
+    
+    /**
+     * Find account by ID with eager fetching of Customer relationship.
+     * 
+     * <p><b>Purpose:</b> Prevents LazyInitializationException when accessing customer
+     * properties (firstName, lastName) outside of transactional context, specifically
+     * for AccountMapper.toResponse() which requires customer data for DTO mapping.</p>
+     * 
+     * <p><b>Replaces COBOL:</b> READ ACCTFILE with implicit customer data access</p>
+     * <p>From: app/cbl/COACTVWC.cbl account view with customer name display</p>
+     * 
+     * <p><b>Query Generated:</b></p>
+     * <pre>SELECT a.*, c.* FROM ACCOUNT a 
+     * INNER JOIN CUSTOMER c ON a.customer_id = c.customer_id 
+     * WHERE a.account_id = ?</pre>
+     * 
+     * <p><b>JOIN FETCH Behavior:</b></p>
+     * <ul>
+     *   <li>Eagerly loads Customer entity in a single SQL query (no N+1 problem)</li>
+     *   <li>Customer proxy is initialized with actual data before session closes</li>
+     *   <li>Safe to access customer.getFirstName() outside @Transactional context</li>
+     *   <li>Returns Optional.empty() if account doesn't exist (NULL-safe)</li>
+     * </ul>
+     * 
+     * <p><b>Use Cases:</b></p>
+     * <ul>
+     *   <li>Account inquiry API (GET /api/v1/accounts/{id}) requiring customer name in response</li>
+     *   <li>Account detail screen display with customer demographics</li>
+     *   <li>Any read-only operation where customer data is needed for DTO mapping</li>
+     * </ul>
+     * 
+     * <p><b>Performance:</b></p>
+     * <ul>
+     *   <li>Single SQL query with INNER JOIN (no lazy loading queries)</li>
+     *   <li>Uses index idx_account_customer for efficient join</li>
+     *   <li>Slightly higher initial query cost but eliminates subsequent customer fetch</li>
+     * </ul>
+     * 
+     * @param id Account ID (surrogate primary key)
+     * @return Optional containing account with customer eagerly loaded, empty if not found
+     * @throws IllegalArgumentException if id is null
+     */
+    @Query("SELECT a FROM Account a JOIN FETCH a.customer WHERE a.accountId = :id")
+    Optional<Account> findByIdWithCustomer(@Param("id") Long id);
+    
+    /**
+     * Find account by ID with pessimistic write lock AND eager fetching of Customer relationship.
+     * 
+     * <p><b>Purpose:</b> Combines concurrent-safe update locking with eager customer loading
+     * to prevent both lost updates (via pessimistic lock) and LazyInitializationException
+     * (via JOIN FETCH) in a single operation.</p>
+     * 
+     * <p><b>Replaces COBOL:</b> READ ACCTFILE KEY IS ACCT-ID WITH LOCK FOR UPDATE + customer data</p>
+     * <p>From: app/cbl/COACTUPC.cbl account update with customer information display</p>
+     * 
+     * <p><b>Query Generated:</b></p>
+     * <pre>SELECT a.*, c.* FROM ACCOUNT a 
+     * INNER JOIN CUSTOMER c ON a.customer_id = c.customer_id 
+     * WHERE a.account_id = ? 
+     * FOR UPDATE</pre>
+     * 
+     * <p><b>Combined Behavior:</b></p>
+     * <ul>
+     *   <li><b>Pessimistic Lock:</b> Acquires exclusive row-level lock (SELECT FOR UPDATE)</li>
+     *   <li><b>Eager Loading:</b> Loads customer data in same SQL query (JOIN FETCH)</li>
+     *   <li><b>Lock Duration:</b> Held until transaction commit/rollback</li>
+     *   <li><b>Concurrency:</b> Blocks other transactions from reading or modifying same account</li>
+     * </ul>
+     * 
+     * <p><b>Why Both Lock and Fetch?</b></p>
+     * <ul>
+     *   <li><b>Lock:</b> Required for read-modify-write atomicity during account updates</li>
+     *   <li><b>Fetch:</b> Required for AccountMapper.toResponse() which accesses customer.firstName</li>
+     *   <li>Without fetch: LazyInitializationException when mapping updated account to response DTO</li>
+     *   <li>Without lock: Lost update anomaly when concurrent transactions modify same account</li>
+     * </ul>
+     * 
+     * <p><b>Use Cases:</b></p>
+     * <ul>
+     *   <li>Account update API (PUT /api/v1/accounts/{id}) - update and return response with customer name</li>
+     *   <li>Transaction posting with customer display (CBTRN01C.cbl) - update balance and show customer</li>
+     *   <li>Payment processing with confirmation (COBIL00C.cbl) - deduct amount and display customer</li>
+     *   <li>Any write operation that requires customer data in the response</li>
+     * </ul>
+     * 
+     * <p><b>Performance:</b></p>
+     * <ul>
+     *   <li>Single SQL query with INNER JOIN + FOR UPDATE clause</li>
+     *   <li>No N+1 problem, no lazy loading queries</li>
+     *   <li>Uses index idx_account_customer for efficient join</li>
+     *   <li>Slightly higher query cost than findByIdWithLock alone</li>
+     *   <li>Lock contention same as findByIdWithLock (per-account row lock)</li>
+     * </ul>
+     * 
+     * <p><b>Transaction Safety:</b></p>
+     * <pre>
+     * Without This Method:                    With This Method:
+     * ──────────────────────────────────────────────────────────────────
+     * Account acc = repo.findByIdWithLock()   Account acc = repo.findByIdWithLockAndCustomer()
+     * // Lock acquired                        // Lock acquired + customer loaded
+     * acc.setCreditLimit(...)                 acc.setCreditLimit(...)
+     * repo.save(acc)                          repo.save(acc)
+     * // Transaction commits                  // Transaction commits
+     * // Lock released                        // Lock released
+     * 
+     * return mapper.toResponse(acc)           return mapper.toResponse(acc)
+     * // LazyInitializationException!         // SUCCESS - customer already loaded
+     * </pre>
+     * 
+     * <p><b>Usage Example:</b></p>
+     * <pre>{@code
+     * @Transactional
+     * public AccountResponse updateAccount(Long accountId, AccountUpdateRequest request) {
+     *     // Acquire lock + load customer in single query
+     *     Account account = accountRepository.findByIdWithLockAndCustomer(accountId)
+     *         .orElseThrow(() -> new ResourceNotFoundException("Account not found"));
+     *     
+     *     // Update account fields
+     *     accountMapper.updateEntityFromRequest(request, account);
+     *     accountRepository.save(account);
+     *     
+     *     // Map to response DTO (customer.firstName accessible - no LazyInitializationException)
+     *     return accountMapper.toResponse(account);
+     * }
+     * }</pre>
+     * 
+     * @param id Account ID (surrogate primary key)
+     * @return Optional containing locked account with customer eagerly loaded, empty if not found
+     * @throws IllegalArgumentException if id is null
+     * @throws org.springframework.dao.PessimisticLockingFailureException if lock cannot be acquired
+     * @throws org.springframework.dao.CannotAcquireLockException if lock timeout exceeded
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT a FROM Account a JOIN FETCH a.customer WHERE a.accountId = :id")
+    Optional<Account> findByIdWithLockAndCustomer(@Param("id") Long id);
 }

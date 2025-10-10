@@ -719,6 +719,13 @@ public class GlobalExceptionHandler {
         // Log full stack trace for debugging (with automatic PCI-DSS masking)
         log.error("Unexpected error at URI: {}", request.getRequestURI(), ex);
         
+        // DEBUG: Print exception to stderr for test debugging
+        System.err.println("=== EXCEPTION CAUGHT BY GlobalExceptionHandler ===");
+        System.err.println("Exception type: " + ex.getClass().getName());
+        System.err.println("Exception message: " + ex.getMessage());
+        ex.printStackTrace(System.err);
+        System.err.println("=== END EXCEPTION ===");
+        
         // Return generic message to prevent sensitive data exposure
         ApiError error = ApiError.builder()
                 .timestamp(LocalDateTime.now())
