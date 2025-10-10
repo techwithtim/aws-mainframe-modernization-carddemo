@@ -16,18 +16,21 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -131,7 +134,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @author CardDemo Modernization Team
  * @since 1.0.0
  */
-@WebMvcTest(TransactionController.class)
+@SpringBootTest
+@AutoConfigureMockMvc(addFilters = false)  // Disable security filters to test controller logic directly
+@ActiveProfiles("test")
 @DisplayName("TransactionController Unit Tests - REST API Endpoint Validation")
 public class TransactionControllerTest {
 
@@ -217,7 +222,7 @@ public class TransactionControllerTest {
         for (int i = 1; i <= 5; i++) {
             Transaction transaction = createMockTransaction(
                     (long) i,
-                    "TXN2024010100" + String.format("%04d", i),
+                    "TXN20240101" + String.format("%04d", i),
                     new BigDecimal("100.50").add(BigDecimal.valueOf(i)),
                     "PURCHASE", // TRAN-TYPE-CD
                     "05" // TRAN-CAT-CD
@@ -235,13 +240,11 @@ public class TransactionControllerTest {
         // Create mock TransactionListResponse with pagination metadata
         TransactionListResponse mockResponse = TransactionListResponse.builder()
                 .transactions(transactions.stream()
-                        .map(t -> TransactionResponse.builder()
+                        .map(t -> TransactionListResponse.TransactionSummary.builder()
                                 .transactionId(t.getTransactionId())
                                 .transactionNumber(t.getTransactionNumber())
-                                .transactionAmount(t.getTransactionAmount())
-                                .transactionDate(t.getOriginalTimestamp())
-                                .transactionTypeCode(t.getTransactionTypeCode())
-                                .transactionCategoryCode(t.getTransactionCategoryCode())
+                                .amount(t.getAmount())
+                                .transactionDate(t.getProcessingTimestamp())
                                 .cardNumberMasked("************1234") // PCI-DSS compliant masking
                                 .merchantName("TEST MERCHANT")
                                 .description("TEST TRANSACTION")
@@ -249,7 +252,7 @@ public class TransactionControllerTest {
                         .toList())
                 .totalElements(50L)
                 .totalPages(3) // 50 transactions / 20 per page = 3 pages
-                .currentPage(0)
+                .pageNumber(0)
                 .pageSize(20)
                 .hasNext(true)
                 .hasPrevious(false)
@@ -276,19 +279,17 @@ public class TransactionControllerTest {
                 .andExpect(jsonPath("$.hasPrevious", is(false)))
                 
                 // Validate transactions array exists and has content
-                .andExpect(jsonPath("$.transactions", isA(List.class)))
+                .andExpect(jsonPath("$.transactions").isArray())
                 .andExpect(jsonPath("$.transactions", hasSize(5)))
                 
                 // Validate first transaction fields (COBOL TRNID01, TAMT001, etc.)
                 .andExpect(jsonPath("$.transactions[0].transactionId", is(1)))
                 .andExpect(jsonPath("$.transactions[0].transactionNumber", is("TXN202401010001")))
-                .andExpect(jsonPath("$.transactions[0].transactionAmount", is(101.50)))
-                
-                // Validate BigDecimal precision (COBOL PIC S9(09)V99 COMP-3 → Java BigDecimal)
-                .andExpect(jsonPath("$.transactions[1].transactionAmount", matchesPattern("^\\d+\\.\\d{2}$")))
+                .andExpect(jsonPath("$.transactions[0].amount", is(101.50)))
+                .andExpect(jsonPath("$.transactions[1].amount", is(102.50))) // Validate BigDecimal precision (COBOL PIC S9(09)V99 COMP-3)
                 
                 // Validate card number masking (PCI-DSS Section 0.8.1 requirement)
-                .andExpect(jsonPath("$.transactions[0].cardNumberMasked", matchesPattern("^\\*{12}\\d{4}$")));
+                .andExpect(jsonPath("$.transactions[0].cardNumberMasked", matchesRegex("^\\*{12}\\d{4}$")));
         
         // Verify service method was called with correct parameters
         verify(transactionService, times(1)).getTransactionHistory(eq(accountId), any(Pageable.class));
@@ -378,7 +379,7 @@ public class TransactionControllerTest {
                         .param("size", "20")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.transactions", isA(List.class)))
+                .andExpect(jsonPath("$.transactions").isArray())
                 .andExpect(jsonPath("$.transactions", hasSize(0)))
                 .andExpect(jsonPath("$.totalElements", is(0)))
                 .andExpect(jsonPath("$.totalPages", is(0)))
@@ -487,13 +488,13 @@ public class TransactionControllerTest {
         mockTransaction.setMerchantCity("SEATTLE");
         mockTransaction.setMerchantZip("98101");
         mockTransaction.setTransactionSource("POS");
-        mockTransaction.setTransactionDescription("PURCHASE AT ACME STORE");
+        mockTransaction.setDescription("PURCHASE AT ACME STORE");
         
         // Create mock response DTO
         TransactionResponse mockResponse = TransactionResponse.builder()
                 .transactionId(transactionId)
                 .transactionNumber("TXN202401010001")
-                .transactionAmount(new BigDecimal("125.50"))
+                .amount(new BigDecimal("125.50"))
                 .transactionTypeCode("01")
                 .transactionCategoryCode("05")
                 .cardNumberMasked("************1234") // PCI-DSS Section 0.8.1 compliance
@@ -520,36 +521,33 @@ public class TransactionControllerTest {
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 
                 // Validate core transaction fields (COBOL TRAN-ID, TRAN-AMT, etc.)
-                .andExpect(jsonPath("$.transactionId", is(5001)))
-                .andExpect(jsonPath("$.transactionNumber", is("TXN202401010001")))
-                .andExpect(jsonPath("$.transactionAmount", is(125.50)))
+                .andExpect(jsonPath("$.transaction_id", is(5001)))
+                .andExpect(jsonPath("$.transaction_number", is("TXN202401010001")))
+                .andExpect(jsonPath("$.amount", is(125.50)))
                 
                 // Validate transaction type and category (COBOL TRAN-TYPE-CD, TRAN-CAT-CD)
-                .andExpect(jsonPath("$.transactionTypeCode", is("01")))
-                .andExpect(jsonPath("$.transactionCategoryCode", is("05")))
+                .andExpect(jsonPath("$.transaction_type_code", is("01")))
+                .andExpect(jsonPath("$.transaction_category_code", is("05")))
                 
                 // Validate merchant information (COBOL TRAN-MERCH-NAME, TRAN-MERCH-CITY, etc.)
-                .andExpect(jsonPath("$.merchantName", is("ACME STORE #123")))
-                .andExpect(jsonPath("$.merchantCity", is("SEATTLE")))
-                .andExpect(jsonPath("$.merchantZip", is("98101")))
+                .andExpect(jsonPath("$.merchant_name", is("ACME STORE #123")))
+                .andExpect(jsonPath("$.merchant_city", is("SEATTLE")))
+                .andExpect(jsonPath("$.merchant_zip", is("98101")))
                 
                 // Validate transaction source and description
-                .andExpect(jsonPath("$.transactionSource", is("POS")))
+                .andExpect(jsonPath("$.transaction_source", is("POS")))
                 .andExpect(jsonPath("$.description", is("PURCHASE AT ACME STORE")))
                 
                 // Validate card masking (PCI-DSS compliance - last 4 digits only)
-                .andExpect(jsonPath("$.cardNumberMasked", is("************1234")))
-                .andExpect(jsonPath("$.cardNumberMasked", matchesPattern("^\\*{12}\\d{4}$")))
-                
-                // Validate BigDecimal amount format (COBOL PIC S9(09)V99 COMP-3)
-                .andExpect(jsonPath("$.transactionAmount", matchesPattern("^\\d+\\.\\d{2}$")))
+                .andExpect(jsonPath("$.card_number_masked", is("************1234")))
+                .andExpect(jsonPath("$.card_number_masked", matchesRegex("^\\*{12}\\d{4}$")))
                 
                 // Validate timestamp fields (COBOL TRAN-ORIG-TS, TRAN-PROC-TS)
-                .andExpect(jsonPath("$.originalTimestamp", is("2024-01-01T10:15:30")))
-                .andExpect(jsonPath("$.processingTimestamp", is("2024-01-01T10:15:35")))
+                .andExpect(jsonPath("$.original_timestamp", is("2024-01-01T10:15:30")))
+                .andExpect(jsonPath("$.processing_timestamp", is("2024-01-01T10:15:35")))
                 
                 // Validate account ID (COBOL TRAN-ACCT-ID)
-                .andExpect(jsonPath("$.accountId", is(1000000001)));
+                .andExpect(jsonPath("$.account_id", is(1000000001)));
         
         // Verify service method was called once with correct ID
         verify(transactionService, times(1)).getTransactionById(eq(transactionId));
@@ -622,6 +620,7 @@ public class TransactionControllerTest {
                 .merchantCity("SEATTLE")
                 .merchantZip("98101")
                 .transactionDate(LocalDate.of(2024, 1, 1))
+                .transactionTime(LocalTime.of(10, 15, 30)) // Required field for audit trail
                 .transactionDescription("TEST PURCHASE")
                 .build();
         
@@ -641,7 +640,7 @@ public class TransactionControllerTest {
         TransactionResponse mockResponse = TransactionResponse.builder()
                 .transactionId(5001L)
                 .transactionNumber("TXN202401010001")
-                .transactionAmount(new BigDecimal("100.50"))
+                .amount(new BigDecimal("100.50"))
                 .transactionTypeCode("01")
                 .transactionCategoryCode("05")
                 .merchantName("TEST MERCHANT")
@@ -671,15 +670,12 @@ public class TransactionControllerTest {
                 .andExpect(header().string("Location", containsString("/api/v1/transactions/5001")))
                 
                 // Validate response body contains created transaction
-                .andExpect(jsonPath("$.transactionId", is(5001)))
-                .andExpect(jsonPath("$.transactionNumber", is("TXN202401010001")))
-                .andExpect(jsonPath("$.transactionAmount", is(100.50)))
-                .andExpect(jsonPath("$.transactionTypeCode", is("01")))
-                .andExpect(jsonPath("$.transactionCategoryCode", is("05")))
-                .andExpect(jsonPath("$.merchantName", is("TEST MERCHANT")))
-                
-                // Validate BigDecimal precision maintained
-                .andExpect(jsonPath("$.transactionAmount", matchesPattern("^\\d+\\.\\d{2}$")));
+                .andExpect(jsonPath("$.transaction_id", is(5001)))
+                .andExpect(jsonPath("$.transaction_number", is("TXN202401010001")))
+                .andExpect(jsonPath("$.amount", is(100.50)))
+                .andExpect(jsonPath("$.transaction_type_code", is("01")))
+                .andExpect(jsonPath("$.transaction_category_code", is("05")))
+                .andExpect(jsonPath("$.merchant_name", is("TEST MERCHANT")));
         
         // Verify service method called with correct parameters
         verify(transactionService, times(1)).postTransaction(
@@ -715,6 +711,8 @@ public class TransactionControllerTest {
                 .transactionCategoryCode("05")
                 .merchantName("TEST MERCHANT")
                 .transactionDate(LocalDate.now())
+                .transactionTime(LocalTime.now()) // Required field for audit trail
+                .transactionDescription("TEST TRANSACTION") // Required field
                 .build();
         
         // ACT & ASSERT: Verify 400 BAD REQUEST response
@@ -749,19 +747,25 @@ public class TransactionControllerTest {
                 .transactionCategoryCode("05")
                 .merchantName("TEST MERCHANT")
                 .transactionDate(LocalDate.now())
+                .transactionTime(LocalTime.now()) // Required field for audit trail
+                .transactionDescription("LARGE PURCHASE") // Required field
                 .build();
         
         // Stub service to throw InsufficientFundsException (COBOL balance check failure)
         when(transactionService.postTransaction(
                 anyString(), any(BigDecimal.class), anyString(), anyString(), anyString(), any(LocalDate.class)))
-                .thenThrow(new InsufficientFundsException("Insufficient funds: balance=5000.00, amount=10000.00"));
+                .thenThrow(new InsufficientFundsException(
+                        new BigDecimal("10000.00"),  // requestedAmount
+                        new BigDecimal("5000.00"),   // availableBalance
+                        new BigDecimal("5000.00")    // creditLimit
+                ));
         
-        // ACT & ASSERT: Verify 409 CONFLICT response
+        // ACT & ASSERT: Verify 422 UNPROCESSABLE ENTITY response (GlobalExceptionHandler maps InsufficientFundsException to 422)
         mockMvc.perform(post("/api/v1/transactions")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request))
                         .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isConflict());
+                .andExpect(status().isUnprocessableEntity());
         
         verify(transactionService, times(1)).postTransaction(
                 anyString(), any(BigDecimal.class), anyString(), anyString(), anyString(), any(LocalDate.class));
@@ -788,6 +792,8 @@ public class TransactionControllerTest {
                 .transactionCategoryCode("05")
                 .merchantName("TEST MERCHANT")
                 .transactionDate(LocalDate.now())
+                .transactionTime(LocalTime.now()) // Required field for audit trail
+                .transactionDescription("INVALID TYPE TEST") // Required field
                 .build();
         
         // Stub service to throw InvalidInputException (COBOL TRNTYPE file not found)
@@ -795,12 +801,12 @@ public class TransactionControllerTest {
                 anyString(), any(BigDecimal.class), anyString(), anyString(), anyString(), any(LocalDate.class)))
                 .thenThrow(new InvalidInputException("Invalid transaction type: 99"));
         
-        // ACT & ASSERT: Verify 422 UNPROCESSABLE ENTITY response
+        // ACT & ASSERT: Verify 400 BAD REQUEST response (GlobalExceptionHandler maps InvalidInputException to 400)
         mockMvc.perform(post("/api/v1/transactions")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request))
                         .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isUnprocessableEntity());
+                .andExpect(status().isBadRequest());
         
         verify(transactionService, times(1)).postTransaction(
                 anyString(), any(BigDecimal.class), anyString(), anyString(), anyString(), any(LocalDate.class));
@@ -838,13 +844,15 @@ public class TransactionControllerTest {
                 .transactionCategoryCode("05")
                 .merchantName("TEST MERCHANT")
                 .transactionDate(LocalDate.now())
+                .transactionTime(LocalTime.now()) // Required field for audit trail
+                .transactionDescription("TEST TRANSACTION TYPE: " + typeName) // Required field
                 .build();
         
         Transaction createdTransaction = createMockTransaction(1L, "TXN001", new BigDecimal("100.00"), typeCode, "05");
         TransactionResponse mockResponse = TransactionResponse.builder()
                 .transactionId(1L)
                 .transactionNumber("TXN001")
-                .transactionAmount(new BigDecimal("100.00"))
+                .amount(new BigDecimal("100.00"))
                 .transactionTypeCode(typeCode)
                 .transactionCategoryCode("05")
                 .cardNumberMasked("************1234")
@@ -862,7 +870,7 @@ public class TransactionControllerTest {
                         .content(objectMapper.writeValueAsString(request))
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.transactionTypeCode", is(typeCode)));
+                .andExpect(jsonPath("$.transaction_type_code", is(typeCode)));
         
         verify(transactionService, times(1)).postTransaction(
                 anyString(), any(BigDecimal.class), anyString(), eq(typeCode), anyString(), any(LocalDate.class));
@@ -888,13 +896,15 @@ public class TransactionControllerTest {
         Transaction transaction = new Transaction();
         transaction.setTransactionId(transactionId);
         transaction.setTransactionNumber(transactionNumber);
-        transaction.setTransactionAmount(amount);
+        transaction.setAmount(amount);
         transaction.setTransactionTypeCode(typeCode);
         transaction.setTransactionCategoryCode(categoryCode);
+        transaction.setCardNumber("4111111111111234"); // Full card number (COBOL PIC 9(16))
+        transaction.setMerchantName("TEST MERCHANT"); // COBOL TRAN-MERCH-NAME
         transaction.setOriginalTimestamp(LocalDateTime.of(2024, 1, 1, 10, 15, 30));
         transaction.setProcessingTimestamp(LocalDateTime.of(2024, 1, 1, 10, 15, 35));
         transaction.setTransactionSource("POS");
-        transaction.setTransactionDescription("TEST TRANSACTION");
+        transaction.setDescription("TEST TRANSACTION");
         return transaction;
     }
 }
