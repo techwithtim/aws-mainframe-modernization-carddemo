@@ -65,6 +65,7 @@
  */
 package com.aws.carddemo.controller;
 
+import com.aws.carddemo.exception.InvalidInputException;
 import com.aws.carddemo.service.ReportService;
 import com.aws.carddemo.service.ReportService.ReportResponse;
 import lombok.RequiredArgsConstructor;
@@ -287,7 +288,7 @@ public class ReportController {
                 //        CALL 'CSUTLDTC' USING CSUTLDTC-DATE, CSUTLDTC-DATE-FORMAT, CSUTLDTC-RESULT
                 if (startDate == null || endDate == null) {
                     log.warn("CUSTOM report requires both startDate and endDate");
-                    throw new IllegalArgumentException(
+                    throw new InvalidInputException(
                             "For CUSTOM report type, both startDate and endDate query parameters are required. " +
                             "Format: yyyy-MM-dd (e.g., startDate=2024-01-01&endDate=2024-01-31)");
                 }
@@ -301,7 +302,7 @@ public class ReportController {
                 //          MOVE 'Select a report type to print report...' TO WS-MESSAGE
                 //          MOVE 'Y' TO WS-ERR-FLG
                 log.warn("Invalid report type requested: {}", reportType);
-                throw new IllegalArgumentException(
+                throw new InvalidInputException(
                         "Invalid report type: " + reportType + ". " +
                         "Allowed values: MONTHLY, YEARLY, CUSTOM (case-insensitive)");
         }

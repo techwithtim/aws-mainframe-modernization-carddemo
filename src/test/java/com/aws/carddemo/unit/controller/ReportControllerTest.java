@@ -38,10 +38,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDate;
@@ -103,7 +105,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @see ReportService
  * @see com.aws.carddemo.batch.config.TransactionReportJobConfig
  */
-@WebMvcTest(ReportController.class)
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
 @WithMockUser(roles = "ADMIN")
 @DisplayName("ReportController Unit Tests")
 class ReportControllerTest {
@@ -173,9 +177,9 @@ class ReportControllerTest {
                 .andExpect(jsonPath("$.reportType").value("TRANSACTION_SUMMARY"))
                 .andExpect(jsonPath("$.startDate").value(expectedStartDate.toString()))
                 .andExpect(jsonPath("$.endDate").value(expectedEndDate.toString()))
-                .andExpect(jsonPath("$.accountId").isEmpty())
+                .andExpect(jsonPath("$.accountId").doesNotExist())
                 .andExpect(jsonPath("$.reportStatus").value("STARTING"))
-                .andExpect(jsonPath("$.downloadUrl").isEmpty())
+                .andExpect(jsonPath("$.downloadUrl").doesNotExist())
                 .andExpect(jsonPath("$.message").value(containsString("submitted")));
         
         // Verify service layer was called with correct calculated dates
@@ -244,7 +248,7 @@ class ReportControllerTest {
                 .andExpect(jsonPath("$.reportType").value("TRANSACTION_SUMMARY"))
                 .andExpect(jsonPath("$.startDate").value(expectedStartDate.toString()))
                 .andExpect(jsonPath("$.endDate").value(expectedEndDate.toString()))
-                .andExpect(jsonPath("$.accountId").isEmpty())
+                .andExpect(jsonPath("$.accountId").doesNotExist())
                 .andExpect(jsonPath("$.reportStatus").value("STARTING"));
         
         // Verify service layer was called with correct calculated year dates
@@ -317,7 +321,7 @@ class ReportControllerTest {
                 .andExpect(jsonPath("$.reportType").value("TRANSACTION_SUMMARY"))
                 .andExpect(jsonPath("$.startDate").value("2024-01-01"))
                 .andExpect(jsonPath("$.endDate").value("2024-03-31"))
-                .andExpect(jsonPath("$.accountId").isEmpty())
+                .andExpect(jsonPath("$.accountId").doesNotExist())
                 .andExpect(jsonPath("$.reportStatus").value("STARTING"));
         
         // Verify service layer was called with exact user-provided dates
@@ -633,7 +637,7 @@ class ReportControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.jobExecutionId").value(jobExecutionId))
                 .andExpect(jsonPath("$.reportStatus").value("STARTED"))
-                .andExpect(jsonPath("$.downloadUrl").isEmpty())
+                .andExpect(jsonPath("$.downloadUrl").doesNotExist())
                 .andExpect(jsonPath("$.estimatedCompletion").isNotEmpty())
                 .andExpect(jsonPath("$.message").value(containsString("in progress")));
         
