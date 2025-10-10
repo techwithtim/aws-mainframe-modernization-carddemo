@@ -488,7 +488,7 @@ class AccountServiceTest {
     void testUpdateAccount_CreditLimitChangedValidatesLimit() {
         // Given: Update request changes credit limit
         AccountUpdateRequest updateRequest = AccountUpdateRequest.builder()
-                .accountStatus("A")
+                .accountStatus("Y")  // Active status
                 .creditLimit(new BigDecimal("4500.00")) // Reducing from $5,000 to $4,500
                 .cashCreditLimit(new BigDecimal("1000.00"))
                 .accountOpenDate(LocalDate.now().minusYears(1))
