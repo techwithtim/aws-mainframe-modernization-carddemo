@@ -156,6 +156,12 @@ public abstract class PostgresTestContainer {
         registry.add("spring.datasource.hikari.maximum-pool-size", () -> 5);
         registry.add("spring.datasource.hikari.minimum-idle", () -> 2);
         registry.add("spring.datasource.hikari.connection-timeout", () -> 10000); // 10 seconds
+        
+        // JWT configuration for authentication tests
+        // Base64-encoded HMAC secret for HS256 signing (256 bits / 32 bytes)
+        registry.add("jwt.secret", () -> "rkWfQKmIAx7gw/olCzn1Qnmoho5RNJzMBl67JOpoJ+8=");
+        registry.add("jwt.expiration", () -> 3600000); // 1 hour in milliseconds
+        registry.add("jwt.algorithm", () -> "HS256");
     }
 
     /**
