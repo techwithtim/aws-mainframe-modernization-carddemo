@@ -141,6 +141,72 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     Page<Transaction> findByAccountAccountId(Long accountId, Pageable pageable);
 
     /**
+     * Finds all transactions for a specific account ID without pagination.
+     * 
+     * <p><b>Purpose:</b> Convenience method for integration tests and service layer operations
+     * that need to verify all transactions for an account without pagination overhead.
+     * 
+     * <p><b>Replaces COBOL Logic:</b> Sequential READ of TRANSACT file with account ID filter:
+     * <pre>{@code
+     * EXEC CICS STARTBR FILE('TRANSACT') RIDFLD(WS-ACCT-ID) END-EXEC
+     * PERFORM UNTIL END-OF-FILE
+     *    EXEC CICS READNEXT FILE('TRANSACT') INTO(TRAN-RECORD) END-EXEC
+     * END-PERFORM
+     * }</pre>
+     * 
+     * <p><b>Query Implementation:</b> Custom JPQL query joins Transaction and Account entities:
+     * <pre>{@code
+     * SELECT t FROM Transaction t 
+     * WHERE t.account.accountId = :accountId 
+     * ORDER BY t.processingTimestamp DESC
+     * }</pre>
+     * 
+     * <p><b>Usage in Integration Tests:</b>
+     * <pre>{@code
+     * // PaymentIntegrationTest.java - Verify payment transaction created
+     * List<Transaction> transactions = transactionRepository.findByAccountId(accountId);
+     * Transaction paymentTransaction = transactions.stream()
+     *     .filter(t -> "PAYMENT".equals(t.getTransactionTypeCode()))
+     *     .findFirst()
+     *     .orElseThrow();
+     * assertEquals(paymentAmount, paymentTransaction.getAmount());
+     * }</pre>
+     * 
+     * <p><b>Performance Warning:</b> This method returns ALL transactions for an account
+     * without pagination. For accounts with thousands of transactions, this can cause
+     * memory pressure and slow query performance. Production code should prefer
+     * {@link #findByAccountAccountId(Long, Pageable)} for large result sets.
+     * 
+     * <p><b>When to Use:</b>
+     * <ul>
+     *   <li><b>Integration Tests:</b> Verify transaction creation and audit fields</li>
+     *   <li><b>Small Result Sets:</b> Accounts with <100 transactions</li>
+     *   <li><b>Aggregate Calculations:</b> Sum all transaction amounts for reporting</li>
+     * </ul>
+     * 
+     * <p><b>When NOT to Use:</b>
+     * <ul>
+     *   <li><b>REST API Endpoints:</b> Always use pagination for user-facing APIs</li>
+     *   <li><b>Large Accounts:</b> Accounts with >1000 transactions (use paginated method)</li>
+     *   <li><b>Production Services:</b> Prefer chunked processing with pagination</li>
+     * </ul>
+     * 
+     * <p><b>Account Relationship Navigation:</b> This method navigates the {@code @ManyToOne}
+     * relationship from Transaction to Account using JPQL path expression {@code t.account.accountId}.
+     * 
+     * <p><b>Technical Specification:</b> Section 0.4.4 - Integration test requirements
+     * mandate non-paginated repository methods for comprehensive transaction verification
+     * 
+     * @param accountId the surrogate key (account_id) of the parent account, must not be null
+     * @return list of ALL transactions for the specified account, ordered by processing
+     *         timestamp descending (most recent first); never null; empty list if account
+     *         has no transactions
+     * @throws IllegalArgumentException if accountId is null
+     */
+    @Query("SELECT t FROM Transaction t WHERE t.account.accountId = :accountId ORDER BY t.processingTimestamp DESC")
+    List<Transaction> findByAccountId(@Param("accountId") Long accountId);
+
+    /**
      * Finds paginated transactions within a specific date range based on processing timestamp,
      * enabling transaction reporting and statement generation.
      * 

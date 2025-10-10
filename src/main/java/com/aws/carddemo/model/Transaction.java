@@ -185,6 +185,40 @@ public class Transaction extends BaseEntity implements Serializable {
     private String transactionNumber;
 
     /**
+     * Payment confirmation number (UUID format) for payment transactions.
+     * 
+     * <p><b>Purpose:</b> Unique identifier for payment confirmations replacing COBOL
+     * sequential TRAN-ID generation with distributed UUID for cloud-native compatibility.
+     * 
+     * <p><b>Format:</b> Standard UUID format (36 characters): "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+     * where each x is a hexadecimal digit [0-9a-f].
+     * 
+     * <p><b>Generation:</b> Server-side UUID generation using {@code UUID.randomUUID()}
+     * ensuring uniqueness across distributed payment processing instances without
+     * centralized sequence coordination.
+     * 
+     * <p><b>Usage:</b> Populated only for payment transactions (transaction_type_code = '02'),
+     * null for other transaction types (purchases, cash advances, etc.).
+     * 
+     * <p><b>COBOL Equivalent:</b> COBIL00C.cbl lines 212-217 sequential ID generation:
+     * <pre>
+     * MOVE HIGH-VALUES TO TRAN-ID
+     * PERFORM STARTBR-TRANSACT-FILE
+     * PERFORM READPREV-TRANSACT-FILE
+     * PERFORM ENDBR-TRANSACT-FILE
+     * ADD 1 TO WS-TRAN-ID-NUM
+     * </pre>
+     * 
+     * <p><b>API Contract:</b> Returned in PaymentResponse DTO to provide customers
+     * with proof of payment for customer service inquiries and dispute resolution.
+     * 
+     * @return the payment confirmation number (UUID format), null for non-payment transactions
+     */
+    @Column(name = "confirmation_number", length = 36)
+    @Size(max = 36, message = "Confirmation number cannot exceed 36 characters")
+    private String confirmationNumber;
+
+    /**
      * Parent account to which this transaction is posted.
      * 
      * <p><b>Fetch Strategy:</b> LAZY fetch to avoid N+1 query problems when loading
@@ -572,5 +606,48 @@ public class Transaction extends BaseEntity implements Serializable {
             return "****************";
         }
         return "************" + cardNumber.substring(12);
+    }
+
+    /**
+     * Convenience method to get the account ID from the associated account.
+     * 
+     * <p><b>Purpose:</b> Provides direct access to the account ID without navigating
+     * through the account object relationship. This simplifies test assertions and
+     * query logic that only needs the foreign key value.
+     * 
+     * <p><b>Usage in Integration Tests:</b> Enables concise assertions like:
+     * <pre>
+     * assertEquals(expectedAccountId, transaction.getAccountId());
+     * </pre>
+     * instead of the more verbose:
+     * <pre>
+     * assertEquals(expectedAccountId, transaction.getAccount().getAccountId());
+     * </pre>
+     * 
+     * <p><b>Null Safety:</b> Returns null if the account association is null,
+     * preventing NullPointerException in test setup scenarios where transactions
+     * might be created before account association is established.
+     * 
+     * <p><b>JPA Relationship:</b> This method accesses the {@link #account} field
+     * which is a {@code @ManyToOne} relationship. The account ID is stored in the
+     * database as {@code account_id} foreign key column, but JPA exposes it through
+     * the relationship object.
+     * 
+     * <p><b>COBOL Equivalent:</b> In COBOL TRAN-RECORD, ACCT-ID is a direct field:
+     * <pre>
+     * 05  ACCT-ID  PIC 9(11).
+     * </pre>
+     * In Java JPA, we model this as a relationship to preserve referential integrity
+     * and enable join queries, but this convenience method provides the COBOL-like
+     * direct access pattern for backward compatibility.
+     * 
+     * <p><b>Technical Specification:</b> Section 0.4.1 - Transformation from COBOL
+     * flat-file foreign keys to JPA object relationships while maintaining access patterns
+     * 
+     * @return the account ID from the associated account, or null if account is null
+     */
+    @Transient
+    public Long getAccountId() {
+        return account != null ? account.getAccountId() : null;
     }
 }

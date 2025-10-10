@@ -525,14 +525,17 @@ public class PaymentService {
         }
         
         // Step 8: Validate payment amount does not exceed current balance (prevent overpayment)
+        // COBOL semantic: "Insufficient funds" in credit card payment context means "you don't owe that much"
         if (paymentAmount.compareTo(currentBalance) > 0) {
             log.warn("Payment amount exceeds current balance: AccountId={}, Amount={}, Balance={}", 
                     accountId, paymentAmount, currentBalance);
-            throw new InvalidInputException(
-                    "paymentAmount",
+            throw new InsufficientFundsException(
                     String.format("Payment amount ($%s) exceeds current balance ($%s). " +
                             "Maximum payment allowed: $%s", 
-                            paymentAmount, currentBalance, currentBalance)
+                            paymentAmount, currentBalance, currentBalance),
+                    paymentAmount,
+                    currentBalance,
+                    account.getCreditLimit()
             );
         }
         
@@ -554,7 +557,8 @@ public class PaymentService {
         String cardNumber = lookupCardNumber(accountId);
         
         // Step 12: Generate payment confirmation number (replaces COBOL sequential ID lines 212-217)
-        String confirmationNumber = generateConfirmationNumber();
+        String confirmationNumber = generateConfirmationNumber(); // 36-char UUID with dashes
+        String transactionNumber = generateTransactionNumber();   // 16-char business key
         
         // Step 13: Create payment transaction record (COBOL WRITE TRANSACT FILE lines 512-547)
         Transaction paymentTransaction = createPaymentTransaction(
@@ -562,6 +566,7 @@ public class PaymentService {
                 cardNumber, 
                 paymentAmount, 
                 paymentDate,
+                transactionNumber,
                 confirmationNumber
         );
         
@@ -874,10 +879,24 @@ public class PaymentService {
      * Generate unique payment confirmation number using UUID.
      * Replaces COBOL sequential transaction ID generation (lines 212-217).
      * 
-     * @return unique confirmation number string (UUID format)
+     * <p>COBOL TRAN-ID is PIC X(16), requiring exactly 16 characters. UUID strings
+     * are 36 characters (32 hex + 4 dashes), so we remove dashes and take first 16
+     * hex characters to fit database constraint while maintaining uniqueness.
+     * 
+     * @return unique confirmation number string (16 characters, hex format)
      */
+    private String generateTransactionNumber() {
+        // Generate 16-character business key for transaction number (VARCHAR 16 constraint)
+        // Example: "550e8400-e29b-41d4-a716-446655440000" → "550E8400E29B41D4"
+        String uuid = UUID.randomUUID().toString().replace("-", "");
+        return uuid.substring(0, 16).toUpperCase(); // 16 hex chars, uppercase
+    }
+    
     private String generateConfirmationNumber() {
-        return UUID.randomUUID().toString();
+        // Generate full UUID (36 characters with dashes) for payment confirmation
+        // This differs from transactionNumber which is 16-char business key
+        // Example: "550e8400-e29b-41d4-a716-446655440000"
+        return UUID.randomUUID().toString(); // Full 36-char UUID with dashes
     }
     
     /**
@@ -888,7 +907,8 @@ public class PaymentService {
      * @param cardNumber the card number for transaction record (may be null)
      * @param paymentAmount the payment amount (positive value)
      * @param paymentDate the payment effective date
-     * @param confirmationNumber the payment confirmation number
+     * @param transactionNumber the 16-char transaction business key
+     * @param confirmationNumber the 36-char payment confirmation UUID
      * @return Transaction entity ready to be persisted
      */
     private Transaction createPaymentTransaction(
@@ -896,24 +916,30 @@ public class PaymentService {
             String cardNumber,
             BigDecimal paymentAmount,
             LocalDate paymentDate,
+            String transactionNumber,
             String confirmationNumber) {
         
-        // Payment transaction amount is NEGATIVE (credit to account)
-        // COBOL line 224: MOVE ACCT-CURR-BAL TO TRAN-AMT (with implicit negative sign handling)
-        BigDecimal transactionAmount = paymentAmount.negate();
+        // Payment transaction amount is stored as POSITIVE value
+        // Transaction type code '02' (PAYMENT) indicates this is a credit to the account
+        // COBOL line 224: MOVE ACCT-CURR-BAL TO TRAN-AMT
+        // Note: In COBOL, credits are negative, but Java validation requires positive amounts
+        // with the transaction type determining debit vs credit semantics
+        BigDecimal transactionAmount = paymentAmount.abs();  // Ensure positive for validation
         
         LocalDateTime timestamp = LocalDateTime.now();
         
         return Transaction.builder()
+                .transactionNumber(transactionNumber)             // Required unique business key (16-char hex)
+                .confirmationNumber(confirmationNumber)           // Payment confirmation (36-char UUID)
                 .account(account)
                 .transactionTypeCode(PAYMENT_TYPE_CODE)           // '02' - Payment
                 .transactionCategoryCode(PAYMENT_CATEGORY_CODE)   // '0002' - Payment category
                 .transactionSource(PAYMENT_SOURCE)                // 'POS TERM'
                 .description(PAYMENT_DESCRIPTION)                 // 'BILL PAYMENT - ONLINE'
-                .amount(transactionAmount)                        // Negative (credit to account)
+                .amount(transactionAmount)                        // Positive (type code indicates credit)
                 .cardNumber(cardNumber)                           // From CardXref lookup
-                .merchantId("PAYMENT")                            // Merchant ID for payment
-                .merchantName("ACCOUNT PAYMENT")                  // Merchant name
+                .merchantId("000000000")                          // Internal payment merchant ID (9 digits)
+                .merchantName("BILL PAYMENT")                     // Merchant name for payment transactions
                 .merchantCity("ONLINE")                           // City
                 .merchantZip("00000")                             // Zip code
                 .originalTimestamp(timestamp)                     // Transaction origination time

@@ -4,7 +4,6 @@ import org.springframework.batch.core.configuration.annotation.EnableBatchProces
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.ComponentScan;
-import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 /**
@@ -40,6 +39,12 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
  *       the com.aws.carddemo package to ensure all Spring-managed components (REST 
  *       controllers, business services, JPA repositories, configuration classes) are 
  *       discovered and registered in the application context</li>
+ *   <li><strong>JPA Auditing:</strong> Automatic auditing of entity creation and 
+ *       modification timestamps is enabled via {@link com.aws.carddemo.config.JpaAuditingConfig},
+ *       which provides the @EnableJpaAuditing annotation to activate auditing infrastructure 
+ *       for {@link org.springframework.data.annotation.CreatedDate} and 
+ *       {@link org.springframework.data.annotation.LastModifiedDate} fields in 
+ *       {@link com.aws.carddemo.model.BaseEntity}</li>
  * </ul>
  * 
  * <h2>System Initialization</h2>
@@ -127,7 +132,6 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @SpringBootApplication
 @EnableBatchProcessing
 @EnableTransactionManagement
-@EnableJpaAuditing
 @ComponentScan(basePackages = "com.aws.carddemo")
 public class CardDemoApplication {
 
