@@ -18,6 +18,7 @@ import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.item.Chunk;
+import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.ItemWriter;
 import org.springframework.batch.item.database.JpaPagingItemReader;
 import org.springframework.beans.factory.annotation.Value;
@@ -450,38 +451,30 @@ public class TransactionReportJobConfig {
      * 
      * @param jobRepository Spring Batch job metadata repository (autowired)
      * @param transactionManager transaction manager for chunk commit/rollback (autowired)
-     * @param entityManagerFactory JPA entity manager factory for reader configuration (autowired)
-     * @param startDate lower bound of date range injected from jobParameters['startDate']
-     * @param endDate upper bound of date range injected from jobParameters['endDate']
-     * @param format output format ("CSV" or "JSON") injected from jobParameters['format']
+     * @param dateRangeTransactionReader @StepScope ItemReader that receives startDate/endDate from JobParameters at runtime
+     * @param transactionReportWriter @StepScope ItemWriter that receives format and date parameters from JobParameters at runtime
      * @return configured Step bean for transaction report generation
-     * @throws Exception if reader initialization fails or parameters are invalid
+     * @throws Exception if step configuration fails
      */
     @Bean
     public Step transactionReportStep(
             JobRepository jobRepository,
             PlatformTransactionManager transactionManager,
-            EntityManagerFactory entityManagerFactory,
-            @Value("#{jobParameters['startDate']}") String startDate,
-            @Value("#{jobParameters['endDate']}") String endDate,
-            @Value("#{jobParameters['format'] ?: 'CSV'}") String format) throws Exception {
+            ItemReader<Transaction> dateRangeTransactionReader,
+            ItemWriter<Transaction> transactionReportWriter) throws Exception {
         
-        log.info("Configuring transactionReportStep with date range: {} to {}, format: {}", 
-                startDate, endDate, format);
+        log.info("Configuring transactionReportStep with chunk size 100 for transaction report generation");
         
-        // Obtain the JpaPagingItemReader from TransactionReader configuration
-        // This reader is @StepScope and receives startDate/endDate from JobParameters
-        JpaPagingItemReader<Transaction> reader = 
-                transactionReader.dateRangeTransactionReader(startDate, endDate, entityManagerFactory);
-        
-        // Create the report writer with format and date range parameters
-        ItemWriter<Transaction> writer = transactionReportWriter(startDate, endDate, format);
+        // The dateRangeTransactionReader and transactionReportWriter are @StepScope beans,
+        // so they will be created at job runtime with JobParameters (startDate, endDate, format)
+        // injected automatically by Spring Batch. This is the correct pattern for using job
+        // parameters with Spring Batch - inject the @StepScope beans, don't call factory methods.
         
         // Build and return the configured step
         return new StepBuilder("transactionReportStep", jobRepository)
                 .<Transaction, Transaction>chunk(100, transactionManager)
-                .reader(reader)
-                .writer(writer)
+                .reader(dateRangeTransactionReader)
+                .writer(transactionReportWriter)
                 .build();
     }
 

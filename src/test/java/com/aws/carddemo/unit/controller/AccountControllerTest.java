@@ -11,18 +11,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.context.annotation.ComponentScan;
-import org.springframework.context.annotation.FilterType;
-import org.springframework.context.annotation.Import;
+
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
-
-import com.aws.carddemo.CardDemoApplication;
-import com.aws.carddemo.config.SecurityConfig;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -188,12 +183,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @see AccountUpdateRequest for request DTO structure and validation rules
  * @see com.aws.carddemo.exception.ResourceNotFoundException for 404 error handling
  */
-@WebMvcTest(controllers = AccountController.class)
-@ContextConfiguration(classes = {
-    AccountController.class, 
-    SecurityConfig.class,
-    com.aws.carddemo.exception.GlobalExceptionHandler.class
-})
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
 @DisplayName("AccountController Unit Tests - COBOL Migration Equivalence")
 public class AccountControllerTest {
 
@@ -205,16 +197,6 @@ public class AccountControllerTest {
     
     @MockBean
     private AccountMapper accountMapper;
-    
-    // Mock UserDetailsService to satisfy SecurityConfig constructor injection
-    // SecurityConfig requires UserDetailsService (interface) as a dependency
-    @MockBean
-    private org.springframework.security.core.userdetails.UserDetailsService userDetailsService;
-    
-    // Mock JwtTokenProvider to satisfy SecurityConfig jwtAuthenticationFilter method
-    // JwtTokenProvider is required by jwtAuthenticationFilter(@Bean method parameter)
-    @MockBean
-    private com.aws.carddemo.security.JwtTokenProvider jwtTokenProvider;
 
     @Autowired
     private ObjectMapper objectMapper;

@@ -19,6 +19,7 @@ import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
+import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.database.JpaPagingItemReader;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -353,12 +354,12 @@ public class StatementGenerationJobConfig {
      *         single-step workflow for monthly statement generation.
      */
     @Bean
-    public Job statementGenerationJob(JobRepository jobRepository, Step step) {
+    public Job statementGenerationJob(JobRepository jobRepository, Step statementGenerationStep) {
         log.info("Configuring statementGenerationJob with single step workflow for monthly statement generation");
         
         return new JobBuilder("statementGenerationJob", jobRepository)
                 .incrementer(new RunIdIncrementer())  // Auto-increment run.id for unique job instances
-                .start(step)                          // Begin with statementGenerationStep
+                .start(statementGenerationStep)                          // Begin with statementGenerationStep
                 .build();
     }
 
@@ -521,30 +522,21 @@ public class StatementGenerationJobConfig {
     public Step statementGenerationStep(
             JobRepository jobRepository,
             PlatformTransactionManager transactionManager,
-            TransactionReader transactionReader,
+            ItemReader<AccountTransactionGroup> accountTransactionGroupReader,
             StatementProcessor statementProcessor,
-            StatementWriter statementWriter,
-            EntityManagerFactory entityManagerFactory,
-            @Value("#{jobParameters['startDate']}") String startDate,
-            @Value("#{jobParameters['endDate']}") String endDate) throws Exception {
+            StatementWriter statementWriter) throws Exception {
         
         log.info("Configuring statementGenerationStep with chunk size 100 for monthly statement processing");
-        log.info("Statement period: {} to {}", startDate, endDate);
         
-        // Obtain configured AccountTransactionGroupReader from TransactionReader configuration
-        // The reader is @StepScope so it receives JobParameters (startDate, endDate) at runtime
+        // The accountTransactionGroupReader is @StepScope, so it will be created at job runtime
+        // with JobParameters (startDate, endDate) injected automatically by Spring Batch
         // This reader groups transactions by account, matching COBOL CBSTM03A.CBL processing pattern
-        var reader = transactionReader.accountTransactionGroupReader(
-                startDate, 
-                endDate, 
-                entityManagerFactory
-        );
         
         return new StepBuilder("statementGenerationStep", jobRepository)
                 .<AccountTransactionGroup, StatementData>chunk(100, transactionManager)  // 100 accounts per transaction commit
-                .reader(reader)                                        // Account-grouped reader with date range filtering
-                .processor(statementProcessor)                        // Statement formatting and masking (AccountTransactionGroup → StatementData)
-                .writer(statementWriter)                              // HTML/PDF generation and file output
+                .reader(accountTransactionGroupReader)                 // Account-grouped reader with date range filtering
+                .processor(statementProcessor)                         // Statement formatting and masking (AccountTransactionGroup → StatementData)
+                .writer(statementWriter)                               // HTML/PDF generation and file output
                 .build();
     }
 }
