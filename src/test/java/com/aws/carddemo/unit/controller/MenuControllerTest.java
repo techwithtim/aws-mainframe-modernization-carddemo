@@ -16,6 +16,7 @@ import com.aws.carddemo.security.JwtAuthenticationFilter;
 import com.aws.carddemo.security.UserDetailsServiceImpl;
 import com.aws.carddemo.service.AuthenticationService;
 import com.aws.carddemo.service.MenuService;
+import com.aws.carddemo.repository.UserRepository;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -157,6 +158,17 @@ class MenuControllerTest {
     
     @MockBean
     private MenuService menuService;
+    
+    @MockBean
+    private UserRepository userRepository;
+    
+    /**
+     * Mock ReportService to prevent batch job dependency issues in test context.
+     * ReportService depends on JobLauncher and Job beans which aren't available
+     * in @SpringBootTest with test profile due to batch auto-configuration exclusions.
+     */
+    @MockBean
+    private com.aws.carddemo.service.ReportService reportService;
     
     @Autowired
     private org.springframework.context.ApplicationContext applicationContext;

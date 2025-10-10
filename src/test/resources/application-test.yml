@@ -80,12 +80,22 @@ spring:
   # ============================================================================
   # SQL Initialization - Test Data Loading
   # ============================================================================
+  # IMPORTANT: Changed from 'always' to 'never' to fix @WebMvcTest failures
+  # 
+  # Previously, spring.sql.init.mode=always caused all tests (including @WebMvcTest)
+  # to attempt loading test data at startup, which failed because:
+  # 1. @WebMvcTest creates a minimal web layer context (no full database initialization)
+  # 2. Test data loading required full JPA context and H2 database
+  # 3. ApplicationContext initialization failed, causing 52 controller tests to error
+  #
+  # Solution: Disable automatic SQL initialization. Integration tests explicitly
+  # load data via @Sql annotations when needed (e.g., @SpringBootTest with @Testcontainers)
   sql:
     init:
-      mode: always                    # Always execute SQL scripts
+      mode: never                     # NEVER auto-load (fixes @WebMvcTest context failures)
       encoding: UTF-8
-      # Test data scripts loaded from test-data/ directory
-      # Individual tests can override with @Sql annotations
+      # Test data scripts available for explicit loading via @Sql annotations:
+      # Example: @Sql(scripts = "classpath:test-data/account-test-data.sql")
       data-locations:
         - classpath:test-data/account-test-data.sql
         - classpath:test-data/card-test-data.sql

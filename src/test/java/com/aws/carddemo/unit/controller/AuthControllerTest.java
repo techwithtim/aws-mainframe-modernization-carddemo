@@ -49,6 +49,7 @@ import com.aws.carddemo.dto.request.LoginRequest;
 import com.aws.carddemo.dto.response.LoginResponse;
 import com.aws.carddemo.exception.AuthenticationFailedException;
 import com.aws.carddemo.service.AuthenticationService;
+import com.aws.carddemo.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import javax.sql.DataSource;
@@ -181,6 +182,17 @@ public class AuthControllerTest {
      */
     @MockBean
     private AuthenticationService authenticationService;
+    
+    @MockBean
+    private UserRepository userRepository;
+    
+    /**
+     * Mock ReportService to prevent batch job dependency issues in test context.
+     * ReportService depends on JobLauncher and Job beans which aren't available
+     * in @SpringBootTest with test profile due to batch auto-configuration exclusions.
+     */
+    @MockBean
+    private com.aws.carddemo.service.ReportService reportService;
 
     /**
      * Jackson ObjectMapper for JSON serialization/deserialization.

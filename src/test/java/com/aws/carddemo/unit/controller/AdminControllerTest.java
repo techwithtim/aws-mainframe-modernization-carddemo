@@ -22,6 +22,7 @@ import com.aws.carddemo.dto.request.UserCreateRequest;
 import com.aws.carddemo.dto.request.UserUpdateRequest;
 import com.aws.carddemo.dto.response.UserResponse;
 import com.aws.carddemo.service.UserService;
+import com.aws.carddemo.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -129,6 +130,17 @@ public class AdminControllerTest {
 
     @MockBean
     private UserService userService;
+    
+    @MockBean
+    private UserRepository userRepository;
+    
+    /**
+     * Mock ReportService to prevent batch job dependency issues in test context.
+     * ReportService depends on JobLauncher and Job beans which aren't available
+     * in @SpringBootTest with test profile due to batch auto-configuration exclusions.
+     */
+    @MockBean
+    private com.aws.carddemo.service.ReportService reportService;
 
     /**
      * Test GET /api/v1/admin/users with admin role returns 200 OK with paginated user list.
