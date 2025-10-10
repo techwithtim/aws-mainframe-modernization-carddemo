@@ -969,14 +969,15 @@ public class TransactionController {
         // All wrapped in @Transactional (CICS SYNCPOINT equivalent)
         
         // Extract parameters from request DTO for service method call
-        // TransactionService.postTransaction expects 6 individual parameters
+        // TransactionService.postTransaction expects 7 individual parameters
         Transaction transaction = transactionService.postTransaction(
                 request.getCardNumber(),
                 request.getTransactionAmount(),
                 request.getMerchantName(),
                 request.getTransactionTypeCode(),
                 request.getTransactionCategoryCode(),
-                request.getTransactionDate()
+                request.getTransactionDate(),
+                request.getTransactionDescription()
         );
         
         // Convert Transaction entity to TransactionResponse DTO
