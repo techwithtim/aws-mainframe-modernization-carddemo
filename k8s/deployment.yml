@@ -1,0 +1,286 @@
+# Kubernetes Deployment manifest for AWS CardDemo Modernized Application
+# Migrated from: COBOL/CICS mainframe application to Java 21 + Spring Boot 3.3
+# Purpose: Defines pod template, replica management, resource allocation, health checks,
+#          and rolling update strategy for the CardDemo REST API and batch processing application
+#
+# Reference: Agent Action Plan Section 0.1.2 (Container-First Deployment)
+#            Technical Specification 5.1 (High-Level Architecture - Kubernetes)
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: carddemo
+  namespace: carddemo
+  labels:
+    app: carddemo
+    version: v1
+    component: application
+    tier: backend
+  annotations:
+    description: "CardDemo modernized application deployment with high availability configuration"
+    migration.source: "COBOL/CICS mainframe application (29 programs)"
+    deployment.strategy: "Rolling update with zero downtime"
+
+spec:
+  # High Availability Configuration
+  # 3 baseline replicas per Technical Specification 5.1
+  # HPA will scale between 3-10 replicas based on CPU/memory utilization
+  replicas: 3
+  
+  # Selector must match pod template labels
+  selector:
+    matchLabels:
+      app: carddemo
+      tier: backend
+  
+  # Rolling Update Strategy
+  # Zero-downtime deployments per Agent Action Plan 0.1.2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1           # Allow 1 extra pod during update (33% surge for 3 replicas)
+      maxUnavailable: 0     # Never reduce available pods (zero downtime requirement)
+  
+  # Minimum time before considering pod ready
+  minReadySeconds: 10
+  
+  # Revision history limit for rollback capability
+  revisionHistoryLimit: 10
+  
+  # Pod Template Specification
+  template:
+    metadata:
+      labels:
+        app: carddemo
+        version: v1
+        tier: backend
+        component: application
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/actuator/prometheus"
+    
+    spec:
+      # Security Context for pod-level security
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      
+      # Container Specifications
+      containers:
+      - name: carddemo
+        # Container image from registry
+        # In production, use specific version tags (e.g., carddemo:1.0.0)
+        # Replace with actual container registry URL (ECR, Docker Hub, etc.)
+        image: carddemo:latest
+        imagePullPolicy: Always
+        
+        # Container-level security context
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false  # Spring Boot needs write access to /tmp
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+              - ALL
+        
+        # Container Port Configuration
+        # Spring Boot application listens on port 8080
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        
+        # Environment Variables - Database Configuration
+        # Non-sensitive configuration from ConfigMap
+        env:
+        # Database connection parameters
+        - name: DB_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: carddemo-config
+              key: DB_HOST
+        - name: DB_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: carddemo-config
+              key: DB_PORT
+        - name: DB_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: carddemo-config
+              key: DB_NAME
+        
+        # Sensitive credentials from Secret
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: carddemo-db-credentials
+              key: DB_USER
+        - name: DB_PASS
+          valueFrom:
+            secretKeyRef:
+              name: carddemo-db-credentials
+              key: DB_PASS
+        
+        # JWT Secret for token-based authentication
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: carddemo-db-credentials
+              key: JWT_SECRET
+        
+        # Spring Boot Profile
+        - name: SPRING_PROFILES_ACTIVE
+          valueFrom:
+            configMapKeyRef:
+              name: carddemo-config
+              key: SPRING_PROFILES_ACTIVE
+        
+        # Connection Pool Configuration (HikariCP)
+        - name: HIKARI_MAX_POOL_SIZE
+          valueFrom:
+            configMapKeyRef:
+              name: carddemo-config
+              key: HIKARI_MAX_POOL_SIZE
+        - name: HIKARI_MIN_IDLE
+          valueFrom:
+            configMapKeyRef:
+              name: carddemo-config
+              key: HIKARI_MIN_IDLE
+        - name: HIKARI_CONNECTION_TIMEOUT
+          valueFrom:
+            configMapKeyRef:
+              name: carddemo-config
+              key: HIKARI_CONNECTION_TIMEOUT
+        
+        # Server Configuration
+        - name: SERVER_PORT
+          value: "8080"
+        
+        # Java Options for container environment
+        - name: JAVA_OPTS
+          value: "-Xms512m -Xmx768m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseContainerSupport"
+        
+        # Resource Limits and Requests
+        # Per Technical Specification 5.1 and Agent Action Plan 0.8.6
+        resources:
+          requests:
+            memory: "512Mi"    # Minimum memory allocation
+            cpu: "500m"        # 0.5 CPU core minimum
+          limits:
+            memory: "1Gi"      # Maximum memory (prevent OOM in cluster)
+            cpu: "1000m"       # 1 CPU core maximum
+        
+        # Liveness Probe
+        # Detects if application is stuck/deadlocked and requires restart
+        # Per Agent Action Plan 0.1.2: 30s initial delay, 10s period
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30    # Wait for application startup
+          periodSeconds: 10           # Check every 10 seconds
+          timeoutSeconds: 5           # Response timeout
+          successThreshold: 1         # Must succeed once to be considered healthy
+          failureThreshold: 3         # Restart after 3 consecutive failures (30s)
+        
+        # Readiness Probe
+        # Determines if pod is ready to receive traffic
+        # Per Agent Action Plan 0.1.2: 20s initial delay, 5s period
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 20    # Wait for application to be ready
+          periodSeconds: 5            # Check every 5 seconds
+          timeoutSeconds: 3           # Response timeout
+          successThreshold: 1         # Ready after 1 success
+          failureThreshold: 3         # Remove from service after 3 failures (15s)
+        
+        # Startup Probe
+        # Provides additional time for slow-starting Spring Boot application
+        # Prevents liveness probe from killing pod during initial startup
+        startupProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 0
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 30         # Allow up to 150 seconds for startup (30 * 5s)
+        
+        # Lifecycle Hooks
+        # Graceful shutdown handling per 12-Factor App principles
+        lifecycle:
+          preStop:
+            exec:
+              # Give application 20 seconds to finish processing current requests
+              command: ["/bin/sh", "-c", "sleep 20"]
+        
+        # Volume Mounts (if needed for temporary files)
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: logs
+          mountPath: /app/logs
+      
+      # Volumes
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: logs
+        emptyDir: {}
+      
+      # Termination Grace Period
+      # Time to wait for pod to shut down gracefully before forceful termination
+      terminationGracePeriodSeconds: 30
+      
+      # DNS Policy
+      dnsPolicy: ClusterFirst
+      
+      # Restart Policy
+      restartPolicy: Always
+      
+      # Image Pull Secrets (if using private registry)
+      # Uncomment and configure if using AWS ECR or private Docker registry
+      # imagePullSecrets:
+      # - name: ecr-registry-secret
+      
+      # Service Account (if using IRSA for AWS access)
+      # serviceAccountName: carddemo-sa
+      
+      # Affinity Rules (optional - for better pod distribution)
+      affinity:
+        # Prefer spreading pods across different availability zones
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - carddemo
+              topologyKey: topology.kubernetes.io/zone
+        # Prefer spreading pods across different nodes
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 50
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - carddemo
+              topologyKey: kubernetes.io/hostname

@@ -1,0 +1,94 @@
+# Kubernetes Namespace Definition for CardDemo Modernized Application
+# This namespace provides logical isolation for all CardDemo application resources
+# deployed to AWS EKS cluster, including deployments, services, ConfigMaps, Secrets,
+# Ingress rules, and HorizontalPodAutoscalers.
+#
+# Migrated from: Legacy mainframe CICS regions (isolated execution environments)
+# to Kubernetes namespace-based multi-tenancy and resource isolation
+#
+# Related Resources:
+# - k8s/deployment.yml: Application deployment specification
+# - k8s/service.yml: LoadBalancer service for external access
+# - k8s/configmap.yml: Externalized configuration
+# - k8s/secret.yml: Sensitive credential storage
+# - k8s/ingress.yml: HTTP routing rules
+# - k8s/hpa.yml: Horizontal pod autoscaler
+#
+# Reference: Agent Action Plan Section 0.1.2 (Container-First Deployment)
+# Reference: Technical Specification Section 5.1 (High-Level Architecture)
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: carddemo
+  
+  labels:
+    # Application identification
+    app: carddemo
+    application: carddemo-modernized
+    component: namespace
+    
+    # Environment classification (update for different environments)
+    environment: production
+    
+    # Project and team identification
+    project: aws-carddemo-modernization
+    team: modernization-team
+    
+    # Version information
+    version: "1.0.0"
+    
+    # Platform identification
+    platform: aws-eks
+    runtime: java21-spring-boot
+    
+    # Legacy system reference
+    legacy-system: cobol-cics-vsam
+    migration-type: tech-stack-modernization
+    
+  annotations:
+    # Namespace description
+    description: "Kubernetes namespace for the modernized AWS CardDemo credit card management application migrated from COBOL/CICS/VSAM to Java 21/Spring Boot 3/PostgreSQL"
+    
+    # Migration metadata
+    migration.carddemo.aws/source-system: "IBM CICS Transaction Server"
+    migration.carddemo.aws/source-language: "COBOL 85"
+    migration.carddemo.aws/target-language: "Java 21"
+    migration.carddemo.aws/target-framework: "Spring Boot 3.3.0"
+    
+    # Contact information
+    contact.email: "carddemo-team@example.com"
+    contact.team: "CardDemo Modernization Team"
+    
+    # Resource quotas and limits reference
+    resource-policy: "production-standard"
+    
+    # Security and compliance
+    security.pci-dss/scope: "true"
+    security.pci-dss/requirements: "Requirement 1 (Firewall), Requirement 3 (Data Protection), Requirement 4 (Encryption in Transit)"
+    security.compliance/encryption-at-rest: "enabled"
+    security.compliance/encryption-in-transit: "required"
+    
+    # Network policy
+    network-policy: "enabled"
+    
+    # Cost allocation and tracking
+    cost-center: "credit-card-operations"
+    business-unit: "financial-services"
+    billing.aws/project: "carddemo-modernization"
+    
+    # Monitoring and observability
+    monitoring.prometheus/scrape: "true"
+    monitoring.prometheus/namespace: "carddemo"
+    logging.cloudwatch/enabled: "true"
+    logging.cloudwatch/log-group: "/aws/eks/carddemo"
+    
+    # Documentation references
+    documentation: "https://github.com/aws-samples/aws-card-demo-modernized/blob/main/docs/architecture.md"
+    repository: "https://github.com/aws-samples/aws-card-demo-modernized"
+    
+    # Lifecycle management
+    created-by: "blitzy-platform"
+    created-date: "2024-01-01"
+    managed-by: "kubernetes"
+    automation-tool: "terraform-and-kubectl"

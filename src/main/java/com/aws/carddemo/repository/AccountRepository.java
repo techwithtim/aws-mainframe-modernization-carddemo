@@ -1,0 +1,414 @@
+package com.aws.carddemo.repository;
+
+import com.aws.carddemo.model.Account;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * Spring Data JPA repository interface for Account entity providing account master data access.
+ * 
+ * <p><b>Migrated from:</b></p>
+ * <ul>
+ *   <li>COBOL Copybook: app/cpy/CVACT01Y.cpy (ACCOUNT-RECORD, 300-byte structure)</li>
+ *   <li>COBOL Programs: app/cbl/CBACT01C.cbl, app/cbl/COACTVWC.cbl, app/cbl/COACTUPC.cbl</li>
+ *   <li>VSAM File: ACCTFILE (KSDS with ACCT-ID as primary key)</li>
+ * </ul>
+ * 
+ * <p><b>Functional Equivalence:</b></p>
+ * <pre>
+ * COBOL Operation                          Java Equivalent
+ * ────────────────────────────────────────────────────────────────────────────
+ * READ ACCTFILE KEY IS ACCT-ID            findByAccountNumber(accountNumber)
+ * READ ACCTFILE KEY IS ACCT-ID            findByIdWithLock(id) [with SELECT FOR UPDATE]
+ *   WITH LOCK FOR UPDATE
+ * STARTBR/READNEXT by CUST-ID            findByCustomer_CustomerIdOrderByAccountNumber(customerId)
+ * STARTBR/READNEXT by GROUP-ID           findByGroupId(groupId)
+ * WRITE ACCTFILE                          save(account) [insert]
+ * REWRITE ACCTFILE                        save(account) [update on existing entity]
+ * DELETE ACCTFILE                         delete(account) or deleteById(id)
+ * </pre>
+ * 
+ * <p><b>Key Design Decisions:</b></p>
+ * <ul>
+ *   <li><b>Query Derivation:</b> Spring Data JPA auto-generates SQL from method names
+ *       (findByAccountNumber, findByCustomerId, findByGroupId) eliminating explicit @Query
+ *       annotations for simple queries.</li>
+ *   <li><b>Pessimistic Locking:</b> findByIdWithLock uses @Lock(LockModeType.PESSIMISTIC_WRITE)
+ *       to acquire database-level exclusive lock (SELECT FOR UPDATE in PostgreSQL), ensuring
+ *       serializable isolation for concurrent balance updates during transaction posting.</li>
+ *   <li><b>Optional Return Type:</b> findByAccountNumber and findByIdWithLock return Optional
+ *       to explicitly handle not-found scenarios without checked exceptions, replacing COBOL
+ *       FILE STATUS checks (NOTFND condition).</li>
+ *   <li><b>List Return Type:</b> findByCustomerId and findByGroupId return List for multi-result
+ *       queries, enabling customer-to-accounts navigation and batch interest calculations.</li>
+ *   <li><b>@Repository Annotation:</b> Enables Spring exception translation from JPA/Hibernate
+ *       persistence exceptions to DataAccessException hierarchy for consistent error handling.</li>
+ * </ul>
+ * 
+ * <p><b>COBOL-to-Java Data Type Mapping:</b></p>
+ * <pre>
+ * COBOL Data Type              Java Type         Database Type
+ * ────────────────────────────────────────────────────────────────────────────
+ * PIC 9(11)                    String            VARCHAR(11)  - accountNumber with leading zeros
+ * PIC S9(10)V99 COMP-3         BigDecimal        NUMERIC(12,2) - financial amounts
+ * PIC X(01)                    String            CHAR(1)       - status flags
+ * PIC X(10) (date YYYY-MM-DD)  LocalDate         DATE          - lifecycle dates
+ * PIC X(10)                    String            VARCHAR(10)   - groupId, ZIP code
+ * </pre>
+ * 
+ * <p><b>Transaction Semantics:</b></p>
+ * <ul>
+ *   <li>All repository methods participate in Spring @Transactional contexts defined in service layer</li>
+ *   <li>COBOL SYNCPOINT → Spring transaction commit (automatic on @Transactional method completion)</li>
+ *   <li>COBOL SYNCPOINT ROLLBACK → Spring transaction rollback (automatic on exception throw)</li>
+ *   <li>Pessimistic locks held until transaction commit/rollback, preventing lost updates</li>
+ * </ul>
+ * 
+ * <p><b>Performance Considerations:</b></p>
+ * <ul>
+ *   <li>Index on account_number (unique) ensures O(log n) lookup performance</li>
+ *   <li>Index on customer_id supports efficient findByCustomerId queries</li>
+ *   <li>Index on group_id supports efficient batch interest calculation filtering</li>
+ *   <li>Lazy fetching of relationships (customer, cards, transactions) prevents N+1 queries</li>
+ * </ul>
+ * 
+ * <p><b>Usage Examples:</b></p>
+ * <pre>{@code
+ * // Account inquiry (replaces COACTVWC.cbl READ operation)
+ * Optional<Account> account = accountRepository.findByAccountNumber("00012345678");
+ * 
+ * // Customer's accounts (replaces customer-to-account navigation)
+ * List<Account> accounts = accountRepository.findByCustomer_CustomerIdOrderByAccountNumber(123L);
+ * 
+ * // Concurrent-safe balance update (replaces CBTRN01C.cbl REWRITE with lock)
+ * Account account = accountRepository.findByIdWithLock(accountId)
+ *     .orElseThrow(() -> new ResourceNotFoundException("Account not found"));
+ * account.setCurrentBalance(account.getCurrentBalance().add(transactionAmount));
+ * accountRepository.save(account); // Updates released after transaction commit
+ * 
+ * // Batch interest calculation (replaces CBACT04C.cbl GROUP-ID filtering)
+ * List<Account> groupAccounts = accountRepository.findByGroupId("GROUP001");
+ * }</pre>
+ * 
+ * @see Account JPA entity representing account master data
+ * @see JpaRepository Spring Data base interface providing CRUD operations
+ * @author CardDemo Modernization Team
+ * @version 1.0.0
+ */
+@Repository
+public interface AccountRepository extends JpaRepository<Account, Long> {
+    
+    /**
+     * Find account by business account number (natural key).
+     * 
+     * <p><b>Replaces COBOL:</b> READ ACCTFILE KEY IS ACCT-ID</p>
+     * <p>From: app/cbl/COACTVWC.cbl line 776-784 (EXEC CICS READ DATASET ACCTFILE RIDFLD)</p>
+     * 
+     * <p><b>Query Generated:</b></p>
+     * <pre>SELECT * FROM ACCOUNT WHERE account_number = ?</pre>
+     * 
+     * <p>Uses unique index idx_account_number for O(log n) lookup performance.</p>
+     * 
+     * <p><b>COBOL FILE STATUS Mapping:</b></p>
+     * <ul>
+     *   <li>DFHRESP(NORMAL) → Optional.of(account)</li>
+     *   <li>DFHRESP(NOTFND) → Optional.empty()</li>
+     * </ul>
+     * 
+     * @param accountNumber 11-digit account number with leading zeros (e.g., "00012345678")
+     * @return Optional containing the account if found, empty Optional otherwise
+     * @throws IllegalArgumentException if accountNumber is null
+     */
+    Optional<Account> findByAccountNumber(String accountNumber);
+    
+    /**
+     * Find all accounts belonging to a specific customer, ordered by account number.
+     * 
+     * <p><b>Replaces COBOL:</b> Sequential browse of ACCTFILE filtered by customer</p>
+     * <p>From: app/cbl/COACTVWC.cbl customer-to-accounts navigation pattern</p>
+     * 
+     * <p><b>Query Generated:</b></p>
+     * <pre>SELECT * FROM ACCOUNT WHERE customer_id = ? ORDER BY account_number ASC</pre>
+     * 
+     * <p>Uses index idx_account_customer for efficient filtering. Results ordered by
+     * account_number to provide consistent ordering for UI display.</p>
+     * 
+     * <p><b>Spring Data Query Derivation:</b></p>
+     * <p>Method name uses underscore notation to traverse nested property path:
+     * Customer_CustomerId → Account.customer (ManyToOne) → Customer.customerId (ID field)
+     * OrderByAccountNumber → Adds ORDER BY account_number ASC clause</p>
+     * 
+     * <p><b>Use Cases:</b></p>
+     * <ul>
+     *   <li>Customer account portfolio view (multiple accounts per customer)</li>
+     *   <li>Cross-account balance aggregation</li>
+     *   <li>Customer relationship management</li>
+     * </ul>
+     * 
+     * @param customerId Customer ID foreign key (Account.customer.customerId)
+     * @return List of accounts owned by the customer ordered by account number, empty list if none found
+     * @throws IllegalArgumentException if customerId is null
+     */
+    List<Account> findByCustomer_CustomerIdOrderByAccountNumber(Long customerId);
+    
+    /**
+     * Find all accounts in a specific disclosure group for interest rate calculation.
+     * 
+     * <p><b>Replaces COBOL:</b> STARTBR/READNEXT operations filtered by ACCT-GROUP-ID</p>
+     * <p>From: app/cbl/CBACT04C.cbl batch interest calculation job</p>
+     * 
+     * <p><b>Query Generated:</b></p>
+     * <pre>SELECT * FROM ACCOUNT WHERE group_id = ? ORDER BY account_number</pre>
+     * 
+     * <p>Uses index idx_account_group for efficient batch processing. Essential for
+     * interest calculation batch jobs where different disclosure groups have different
+     * APR rates.</p>
+     * 
+     * <p><b>Use Cases:</b></p>
+     * <ul>
+     *   <li>Batch interest calculation (CBACT04C.cbl) - process all accounts in group</li>
+     *   <li>Disclosure group reporting and analytics</li>
+     *   <li>APR assignment validation</li>
+     * </ul>
+     * 
+     * <p><b>Batch Processing Pattern:</b></p>
+     * <pre>{@code
+     * List<Account> groupAccounts = accountRepository.findByGroupId("GROUP001");
+     * for (Account account : groupAccounts) {
+     *     BigDecimal interest = interestCalculationService.calculateInterest(account);
+     *     account.setCurrentBalance(account.getCurrentBalance().add(interest));
+     *     accountRepository.save(account);
+     * }
+     * }</pre>
+     * 
+     * @param groupId Disclosure group ID (e.g., "GROUP001", "GROUP002")
+     * @return List of accounts in the group, empty list if none found
+     * @throws IllegalArgumentException if groupId is null
+     */
+    List<Account> findByGroupId(String groupId);
+    
+    /**
+     * Find account by ID with pessimistic write lock for concurrent-safe updates.
+     * 
+     * <p><b>Replaces COBOL:</b> READ ACCTFILE KEY IS ACCT-ID WITH LOCK FOR UPDATE</p>
+     * <p>From: app/cbl/CBTRN01C.cbl transaction posting with exclusive record lock</p>
+     * 
+     * <p><b>Locking Mechanism:</b></p>
+     * <p>@Lock(LockModeType.PESSIMISTIC_WRITE) generates PostgreSQL SELECT FOR UPDATE,
+     * acquiring an exclusive row-level lock that blocks other transactions from reading
+     * or modifying the same account record until the current transaction commits or rolls back.</p>
+     * 
+     * <p><b>SQL Generated:</b></p>
+     * <pre>SELECT * FROM ACCOUNT WHERE account_id = ? FOR UPDATE</pre>
+     * 
+     * <p><b>Transaction Isolation:</b></p>
+     * <ul>
+     *   <li><b>Lock Scope:</b> Row-level exclusive lock on single account record</li>
+     *   <li><b>Lock Duration:</b> Held until transaction commit/rollback</li>
+     *   <li><b>Concurrency:</b> Blocks concurrent transactions attempting to lock same account</li>
+     *   <li><b>Deadlock Prevention:</b> Always acquire locks in consistent order (account ID ascending)</li>
+     * </ul>
+     * 
+     * <p><b>Use Cases:</b></p>
+     * <ul>
+     *   <li>Transaction posting (CBTRN01C.cbl) - update current balance with debit/credit</li>
+     *   <li>Payment processing (COBIL00C.cbl) - ensure sufficient funds before deduction</li>
+     *   <li>Interest calculation (CBACT04C.cbl) - prevent concurrent balance modifications</li>
+     *   <li>Any operation requiring read-modify-write atomicity</li>
+     * </ul>
+     * 
+     * <p><b>ACID Guarantee:</b></p>
+     * <p>Prevents lost update anomaly where concurrent transactions might overwrite each other's
+     * balance changes:</p>
+     * <pre>
+     * Without Lock (Lost Update):          With Pessimistic Lock:
+     * ────────────────────────────────────────────────────────────
+     * T1: READ balance = $1000            T1: READ balance = $1000 (LOCKED)
+     * T2: READ balance = $1000            T2: BLOCKED waiting for lock
+     * T1: balance -= $100 = $900          T1: balance -= $100 = $900
+     * T1: WRITE balance = $900            T1: WRITE balance = $900
+     * T2: balance += $50 = $1050          T1: COMMIT (lock released)
+     * T2: WRITE balance = $1050           T2: READ balance = $900 (LOCKED)
+     * RESULT: $1050 (lost T1's -$100)     T2: balance += $50 = $950
+     *                                      T2: WRITE balance = $950
+     *                                      T2: COMMIT
+     *                                      RESULT: $950 (correct)
+     * </pre>
+     * 
+     * <p><b>Performance Impact:</b></p>
+     * <ul>
+     *   <li><b>Lock Contention:</b> High-frequency accounts (e.g., checking accounts with many
+     *       transactions) may experience increased wait times under heavy concurrent load</li>
+     *   <li><b>Lock Timeout:</b> PostgreSQL default lock_timeout applies; transactions waiting
+     *       longer than configured timeout will fail with lock acquisition error</li>
+     *   <li><b>Best Practice:</b> Keep transaction duration short to minimize lock hold time</li>
+     * </ul>
+     * 
+     * <p><b>Usage Example:</b></p>
+     * <pre>{@code
+     * @Transactional
+     * public void postTransaction(Long accountId, BigDecimal amount) {
+     *     Account account = accountRepository.findByIdWithLock(accountId)
+     *         .orElseThrow(() -> new ResourceNotFoundException("Account not found"));
+     *     
+     *     // Lock is held here - no other transaction can modify this account
+     *     BigDecimal newBalance = account.getCurrentBalance().add(amount);
+     *     account.setCurrentBalance(newBalance);
+     *     accountRepository.save(account);
+     *     
+     *     // Lock automatically released on transaction commit
+     * }
+     * }</pre>
+     * 
+     * @param id Account ID (surrogate primary key)
+     * @return Optional containing the locked account if found, empty Optional otherwise
+     * @throws IllegalArgumentException if id is null
+     * @throws org.springframework.dao.PessimisticLockingFailureException if lock cannot be acquired
+     * @throws org.springframework.dao.CannotAcquireLockException if lock timeout exceeded
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT a FROM Account a WHERE a.accountId = :id")
+    Optional<Account> findByIdWithLock(@Param("id") Long id);
+    
+    /**
+     * Find account by ID with eager fetching of Customer relationship.
+     * 
+     * <p><b>Purpose:</b> Prevents LazyInitializationException when accessing customer
+     * properties (firstName, lastName) outside of transactional context, specifically
+     * for AccountMapper.toResponse() which requires customer data for DTO mapping.</p>
+     * 
+     * <p><b>Replaces COBOL:</b> READ ACCTFILE with implicit customer data access</p>
+     * <p>From: app/cbl/COACTVWC.cbl account view with customer name display</p>
+     * 
+     * <p><b>Query Generated:</b></p>
+     * <pre>SELECT a.*, c.* FROM ACCOUNT a 
+     * INNER JOIN CUSTOMER c ON a.customer_id = c.customer_id 
+     * WHERE a.account_id = ?</pre>
+     * 
+     * <p><b>JOIN FETCH Behavior:</b></p>
+     * <ul>
+     *   <li>Eagerly loads Customer entity in a single SQL query (no N+1 problem)</li>
+     *   <li>Customer proxy is initialized with actual data before session closes</li>
+     *   <li>Safe to access customer.getFirstName() outside @Transactional context</li>
+     *   <li>Returns Optional.empty() if account doesn't exist (NULL-safe)</li>
+     * </ul>
+     * 
+     * <p><b>Use Cases:</b></p>
+     * <ul>
+     *   <li>Account inquiry API (GET /api/v1/accounts/{id}) requiring customer name in response</li>
+     *   <li>Account detail screen display with customer demographics</li>
+     *   <li>Any read-only operation where customer data is needed for DTO mapping</li>
+     * </ul>
+     * 
+     * <p><b>Performance:</b></p>
+     * <ul>
+     *   <li>Single SQL query with INNER JOIN (no lazy loading queries)</li>
+     *   <li>Uses index idx_account_customer for efficient join</li>
+     *   <li>Slightly higher initial query cost but eliminates subsequent customer fetch</li>
+     * </ul>
+     * 
+     * @param id Account ID (surrogate primary key)
+     * @return Optional containing account with customer eagerly loaded, empty if not found
+     * @throws IllegalArgumentException if id is null
+     */
+    @Query("SELECT a FROM Account a JOIN FETCH a.customer WHERE a.accountId = :id")
+    Optional<Account> findByIdWithCustomer(@Param("id") Long id);
+    
+    /**
+     * Find account by ID with pessimistic write lock AND eager fetching of Customer relationship.
+     * 
+     * <p><b>Purpose:</b> Combines concurrent-safe update locking with eager customer loading
+     * to prevent both lost updates (via pessimistic lock) and LazyInitializationException
+     * (via JOIN FETCH) in a single operation.</p>
+     * 
+     * <p><b>Replaces COBOL:</b> READ ACCTFILE KEY IS ACCT-ID WITH LOCK FOR UPDATE + customer data</p>
+     * <p>From: app/cbl/COACTUPC.cbl account update with customer information display</p>
+     * 
+     * <p><b>Query Generated:</b></p>
+     * <pre>SELECT a.*, c.* FROM ACCOUNT a 
+     * INNER JOIN CUSTOMER c ON a.customer_id = c.customer_id 
+     * WHERE a.account_id = ? 
+     * FOR UPDATE</pre>
+     * 
+     * <p><b>Combined Behavior:</b></p>
+     * <ul>
+     *   <li><b>Pessimistic Lock:</b> Acquires exclusive row-level lock (SELECT FOR UPDATE)</li>
+     *   <li><b>Eager Loading:</b> Loads customer data in same SQL query (JOIN FETCH)</li>
+     *   <li><b>Lock Duration:</b> Held until transaction commit/rollback</li>
+     *   <li><b>Concurrency:</b> Blocks other transactions from reading or modifying same account</li>
+     * </ul>
+     * 
+     * <p><b>Why Both Lock and Fetch?</b></p>
+     * <ul>
+     *   <li><b>Lock:</b> Required for read-modify-write atomicity during account updates</li>
+     *   <li><b>Fetch:</b> Required for AccountMapper.toResponse() which accesses customer.firstName</li>
+     *   <li>Without fetch: LazyInitializationException when mapping updated account to response DTO</li>
+     *   <li>Without lock: Lost update anomaly when concurrent transactions modify same account</li>
+     * </ul>
+     * 
+     * <p><b>Use Cases:</b></p>
+     * <ul>
+     *   <li>Account update API (PUT /api/v1/accounts/{id}) - update and return response with customer name</li>
+     *   <li>Transaction posting with customer display (CBTRN01C.cbl) - update balance and show customer</li>
+     *   <li>Payment processing with confirmation (COBIL00C.cbl) - deduct amount and display customer</li>
+     *   <li>Any write operation that requires customer data in the response</li>
+     * </ul>
+     * 
+     * <p><b>Performance:</b></p>
+     * <ul>
+     *   <li>Single SQL query with INNER JOIN + FOR UPDATE clause</li>
+     *   <li>No N+1 problem, no lazy loading queries</li>
+     *   <li>Uses index idx_account_customer for efficient join</li>
+     *   <li>Slightly higher query cost than findByIdWithLock alone</li>
+     *   <li>Lock contention same as findByIdWithLock (per-account row lock)</li>
+     * </ul>
+     * 
+     * <p><b>Transaction Safety:</b></p>
+     * <pre>
+     * Without This Method:                    With This Method:
+     * ──────────────────────────────────────────────────────────────────
+     * Account acc = repo.findByIdWithLock()   Account acc = repo.findByIdWithLockAndCustomer()
+     * // Lock acquired                        // Lock acquired + customer loaded
+     * acc.setCreditLimit(...)                 acc.setCreditLimit(...)
+     * repo.save(acc)                          repo.save(acc)
+     * // Transaction commits                  // Transaction commits
+     * // Lock released                        // Lock released
+     * 
+     * return mapper.toResponse(acc)           return mapper.toResponse(acc)
+     * // LazyInitializationException!         // SUCCESS - customer already loaded
+     * </pre>
+     * 
+     * <p><b>Usage Example:</b></p>
+     * <pre>{@code
+     * @Transactional
+     * public AccountResponse updateAccount(Long accountId, AccountUpdateRequest request) {
+     *     // Acquire lock + load customer in single query
+     *     Account account = accountRepository.findByIdWithLockAndCustomer(accountId)
+     *         .orElseThrow(() -> new ResourceNotFoundException("Account not found"));
+     *     
+     *     // Update account fields
+     *     accountMapper.updateEntityFromRequest(request, account);
+     *     accountRepository.save(account);
+     *     
+     *     // Map to response DTO (customer.firstName accessible - no LazyInitializationException)
+     *     return accountMapper.toResponse(account);
+     * }
+     * }</pre>
+     * 
+     * @param id Account ID (surrogate primary key)
+     * @return Optional containing locked account with customer eagerly loaded, empty if not found
+     * @throws IllegalArgumentException if id is null
+     * @throws org.springframework.dao.PessimisticLockingFailureException if lock cannot be acquired
+     * @throws org.springframework.dao.CannotAcquireLockException if lock timeout exceeded
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT a FROM Account a JOIN FETCH a.customer WHERE a.accountId = :id")
+    Optional<Account> findByIdWithLockAndCustomer(@Param("id") Long id);
+}

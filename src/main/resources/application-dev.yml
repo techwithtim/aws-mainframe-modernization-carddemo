@@ -1,0 +1,316 @@
+# ============================================================================
+# AWS CardDemo Modernized - Development Profile Configuration
+# ============================================================================
+# This configuration is activated when running with --spring.profiles.active=dev
+# Optimized for local development without Docker dependencies
+# Provides H2 in-memory database, detailed logging, and hot reload support
+# ============================================================================
+
+spring:
+  # Application Configuration
+  application:
+    name: carddemo-modernized
+  
+  # ============================================================================
+  # Database Configuration - H2 In-Memory (Primary for Local Development)
+  # ============================================================================
+  # H2 provides fast startup and no external dependencies for rapid development
+  datasource:
+    url: jdbc:h2:mem:carddemo;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 20000
+      idle-timeout: 300000
+      max-lifetime: 1200000
+      pool-name: CardDemo-Dev-HikariCP
+  
+  # ============================================================================
+  # Alternative: Local PostgreSQL Configuration (Uncomment to use)
+  # ============================================================================
+  # Use this configuration if you prefer to test against a local PostgreSQL instance
+  # Requires PostgreSQL running on localhost:5432 with database 'carddemo_dev'
+  #
+  # datasource:
+  #   url: jdbc:postgresql://localhost:5432/carddemo_dev
+  #   driver-class-name: org.postgresql.Driver
+  #   username: postgres
+  #   password: postgres
+  #   hikari:
+  #     maximum-pool-size: 10
+  #     minimum-idle: 2
+  #     connection-timeout: 20000
+  #     idle-timeout: 300000
+  #     max-lifetime: 1200000
+  #     pool-name: CardDemo-Dev-HikariCP
+  
+  # ============================================================================
+  # JPA/Hibernate Configuration
+  # ============================================================================
+  jpa:
+    # Automatically create/drop schema on startup for rapid development iteration
+    hibernate:
+      ddl-auto: create-drop
+    
+    # Enable SQL statement logging for debugging
+    show-sql: true
+    
+    properties:
+      hibernate:
+        # Format SQL for readability in console
+        format_sql: true
+        
+        # Use H2 dialect (automatically detected, but explicit for clarity)
+        dialect: org.hibernate.dialect.H2Dialect
+        
+        # Uncomment below if using local PostgreSQL instead
+        # dialect: org.hibernate.dialect.PostgreSQLDialect
+        
+        # Show SQL comments
+        use_sql_comments: true
+        
+        # Enable statistics for performance monitoring
+        generate_statistics: false
+        
+        # Batch processing
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+  
+  # ============================================================================
+  # H2 Console Configuration
+  # ============================================================================
+  # Web-based console for browsing H2 database
+  # Access at: http://localhost:8080/h2-console
+  # JDBC URL: jdbc:h2:mem:carddemo
+  # Username: sa
+  # Password: (leave blank)
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+      settings:
+        trace: false
+        web-allow-others: false
+  
+  # ============================================================================
+  # Flyway Configuration
+  # ============================================================================
+  flyway:
+    # Enable Flyway migrations even with ddl-auto=create-drop
+    enabled: true
+    # Clean database before migrations (dev only!)
+    clean-on-validation-error: true
+    # Allow mixing transactional and non-transactional migrations
+    mixed: true
+    # Baseline on migrate for existing schemas
+    baseline-on-migrate: true
+    # Validate migrations on startup
+    validate-on-migrate: true
+    # Location of migration scripts
+    locations: classpath:db/migration
+  
+  # ============================================================================
+  # Spring Batch Configuration
+  # ============================================================================
+  batch:
+    jdbc:
+      # Initialize Spring Batch schema automatically
+      initialize-schema: always
+    job:
+      # Disable automatic job execution on startup (manual trigger only)
+      enabled: false
+  
+  # ============================================================================
+  # Security Configuration (Relaxed for Local Development)
+  # ============================================================================
+  security:
+    # JWT token configuration
+    jwt:
+      secret: dev-secret-key-minimum-32-characters-long-for-hs512-algorithm
+      expiration: 3600000  # 1 hour in milliseconds
+  
+  # ============================================================================
+  # DevTools Configuration (Hot Reload)
+  # ============================================================================
+  devtools:
+    restart:
+      # Enable automatic restart on code changes
+      enabled: true
+      # Exclude static resources from restart triggers
+      exclude: static/**,public/**,templates/**
+      # Additional paths to watch
+      additional-paths: src/main/java
+    livereload:
+      # Enable LiveReload for browser auto-refresh
+      enabled: true
+      port: 35729
+  
+  # ============================================================================
+  # Web Configuration
+  # ============================================================================
+  mvc:
+    # Throw exception if no handler is found (for better debugging)
+    throw-exception-if-no-handler-found: true
+  
+  # ============================================================================
+  # Jackson JSON Configuration
+  # ============================================================================
+  jackson:
+    serialization:
+      # Pretty-print JSON responses for easier debugging
+      indent-output: true
+      # Write dates as strings, not timestamps
+      write-dates-as-timestamps: false
+    default-property-inclusion: non_null
+    time-zone: UTC
+
+# ============================================================================
+# Server Configuration
+# ============================================================================
+server:
+  port: 8080
+  servlet:
+    context-path: /
+    session:
+      timeout: 30m
+  error:
+    # Include error details in responses (dev only!)
+    include-message: always
+    include-binding-errors: always
+    include-stacktrace: always
+    include-exception: true
+
+# ============================================================================
+# Management & Actuator Configuration
+# ============================================================================
+management:
+  endpoints:
+    web:
+      exposure:
+        # Expose all actuator endpoints for development monitoring
+        include: '*'
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+    shutdown:
+      enabled: true
+  health:
+    db:
+      enabled: true
+    diskspace:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+
+# ============================================================================
+# Logging Configuration
+# ============================================================================
+logging:
+  level:
+    # Root logger
+    root: INFO
+    
+    # Application packages - DEBUG for detailed development logging
+    com.aws.carddemo: DEBUG
+    
+    # Spring Framework
+    org.springframework: INFO
+    org.springframework.web: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.batch: DEBUG
+    
+    # Hibernate/JPA - Show SQL and parameters
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.hibernate.type.descriptor.sql.BasicExtractor: TRACE
+    org.hibernate.engine.transaction.internal.TransactionImpl: DEBUG
+    
+    # Connection pool
+    com.zaxxer.hikari: DEBUG
+    
+    # Flyway migrations
+    org.flywaydb: DEBUG
+    
+    # H2 Database
+    org.h2: INFO
+  
+  pattern:
+    # Console log pattern with timestamp and thread
+    console: '%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n'
+  
+  file:
+    # Write logs to file for later analysis
+    name: logs/carddemo-dev.log
+    max-size: 10MB
+    max-history: 7
+
+# ============================================================================
+# Application-Specific Configuration
+# ============================================================================
+carddemo:
+  # Security settings
+  security:
+    # Disable CSRF for local API testing with tools like Postman
+    csrf-enabled: false
+    # Allow all CORS origins in development
+    cors-allowed-origins: '*'
+    cors-allowed-methods: GET,POST,PUT,DELETE,OPTIONS
+    cors-allowed-headers: '*'
+    cors-allow-credentials: true
+  
+  # Batch job settings
+  batch:
+    # Chunk size for batch processing
+    chunk-size: 100
+    # Thread pool size
+    thread-pool-size: 2
+    # Enable batch job scheduling
+    scheduling-enabled: false
+  
+  # API settings
+  api:
+    # API version prefix
+    version: v1
+    # Enable Swagger UI
+    swagger-enabled: true
+    # Base URL for API documentation
+    base-url: http://localhost:8080
+  
+  # File processing
+  files:
+    # Temporary directory for file uploads
+    upload-dir: /tmp/carddemo/uploads
+    # Maximum file size
+    max-upload-size: 10MB
+
+# ============================================================================
+# Development Notes
+# ============================================================================
+# 1. This profile uses H2 in-memory database by default for zero-setup development
+# 2. Database schema is recreated on each application restart (ddl-auto: create-drop)
+# 3. All SQL statements are logged to console with formatting for debugging
+# 4. H2 Console is available at http://localhost:8080/h2-console
+# 5. Security is relaxed (CSRF disabled, all CORS origins allowed)
+# 6. Detailed DEBUG logging is enabled for application packages
+# 7. DevTools enables hot reload - changes trigger automatic restart
+# 8. All actuator endpoints are exposed for monitoring and diagnostics
+# 9. Error responses include full stack traces for easier debugging
+# 10. To use local PostgreSQL instead, uncomment the PostgreSQL datasource config
+#
+# Migration from COBOL Development:
+# - Replaces local VSAM file testing with H2 in-memory database
+# - Equivalent to COBOL development environment with test datasets
+# - Fast startup time (~5 seconds) vs mainframe compile/link cycles
+# - Flyway migrations automatically load test data (equivalent to IEBGENER jobs)
+# ============================================================================

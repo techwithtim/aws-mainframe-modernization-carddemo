@@ -1,0 +1,546 @@
+# ============================================================================
+# AWS CardDemo Modernized - Terraform Variables Example
+# ============================================================================
+#
+# This is an EXAMPLE Terraform variables file for the CardDemo infrastructure.
+# 
+# USAGE INSTRUCTIONS:
+# 1. Copy this file to terraform.tfvars:
+#    $ cp terraform.tfvars.example terraform.tfvars
+#
+# 2. Edit terraform.tfvars with your specific values
+#
+# 3. Review and update all placeholder values, especially:
+#    - db_password (MUST be changed from placeholder)
+#    - allowed_cidr_blocks (restrict to your network ranges)
+#    - tags (update with your organization details)
+#
+# SECURITY WARNING:
+# - NEVER commit terraform.tfvars with real credentials to Git
+# - Add terraform.tfvars to .gitignore
+# - Use AWS Secrets Manager or SSM Parameter Store for production passwords
+# - Rotate database passwords regularly (90-day cycle recommended)
+#
+# For complete variable documentation, see variables.tf
+# ============================================================================
+
+# ============================================================================
+# AWS REGION AND ENVIRONMENT CONFIGURATION
+# ============================================================================
+
+# AWS region where all resources will be created
+# Common options: us-east-1, us-west-2, eu-west-1, ap-southeast-1
+aws_region = "us-east-1"
+
+# Availability zones for multi-AZ deployment
+# Must be valid AZs in the selected region
+# Recommendation: Use at least 2 AZs for high availability
+availability_zones = ["us-east-1a", "us-east-1b", "us-east-1c"]
+
+# Environment identifier (dev/test/prod)
+# This affects resource naming, sizing, and cost optimization settings
+# Options: "dev" (development), "test" (staging/QA), "prod" (production)
+environment = "dev"
+
+# ============================================================================
+# EKS CLUSTER CONFIGURATION
+# ============================================================================
+
+# EKS cluster name (will be suffixed with environment)
+# Example: carddemo-eks-dev, carddemo-eks-prod
+cluster_name = "carddemo-eks"
+
+# Kubernetes version
+# Recommendation: Use stable releases (1.28+)
+# Check AWS EKS documentation for supported versions
+kubernetes_version = "1.28"
+
+# --------------------------------------------------------------------------
+# Node Group Configuration - DEVELOPMENT ENVIRONMENT
+# --------------------------------------------------------------------------
+# Development settings optimize for cost with minimal resource allocation
+# Suitable for: developer testing, feature development, CI/CD builds
+# Estimated monthly cost: $150-200
+
+# Number of worker nodes to maintain
+node_group_desired_capacity = 2
+
+# Minimum number of worker nodes (for cost savings in dev)
+node_group_min_size = 1
+
+# Maximum number of worker nodes (limited scaling in dev)
+node_group_max_size = 3
+
+# Instance types for worker nodes
+# t3.small: 2 vCPU, 2GB RAM - suitable for low-traffic development workloads
+# Recommendation: Use t3.small for dev, t3.medium for test, t3.large for prod
+node_instance_types = ["t3.small"]
+
+# --------------------------------------------------------------------------
+# Node Group Configuration - TEST/STAGING ENVIRONMENT (commented examples)
+# --------------------------------------------------------------------------
+# Uncomment and adjust for test/staging environment
+# Test settings balance cost and performance for QA validation
+# Estimated monthly cost: $300-400
+#
+# node_group_desired_capacity = 2
+# node_group_min_size = 2
+# node_group_max_size = 5
+# node_instance_types = ["t3.medium"]  # 2 vCPU, 4GB RAM
+
+# --------------------------------------------------------------------------
+# Node Group Configuration - PRODUCTION ENVIRONMENT (commented examples)
+# --------------------------------------------------------------------------
+# Uncomment and adjust for production environment
+# Production settings ensure high availability and handle 1,000+ concurrent users
+# Estimated monthly cost: $800-1200
+#
+# node_group_desired_capacity = 3  # High availability baseline
+# node_group_min_size = 2          # Maintain redundancy during scale-down
+# node_group_max_size = 10         # Support peak load (1,000+ users)
+# node_instance_types = ["t3.medium", "t3.large"]  # 2-4 vCPU for production load
+
+# Enable Cluster Autoscaler for horizontal pod autoscaling
+enable_cluster_autoscaler = true
+
+# Allow public access to EKS API server endpoint
+# Recommendation: true for development (kubectl from developer workstations)
+#                 Consider VPN/bastion for production security
+cluster_endpoint_public_access = true
+
+# ============================================================================
+# RDS POSTGRESQL DATABASE CONFIGURATION
+# ============================================================================
+
+# PostgreSQL engine version
+# Recommendation: Use PostgreSQL 15 LTS for stability and performance
+db_engine_version = "15.4"
+
+# Database name (created on initial provisioning)
+db_name = "carddemo"
+
+# Master database username
+db_username = "carddemo_admin"
+
+# Master database password
+# CRITICAL: Replace with a strong password (minimum 16 characters, mixed case, numbers, symbols)
+# SECURITY: Use AWS Secrets Manager or SSM Parameter Store for production
+# Example strong password generation: openssl rand -base64 24
+db_password = "REPLACE_WITH_STRONG_PASSWORD_MINIMUM_16_CHARS"
+
+# PostgreSQL port (standard default)
+db_port = 5432
+
+# --------------------------------------------------------------------------
+# Database Instance Configuration - DEVELOPMENT ENVIRONMENT
+# --------------------------------------------------------------------------
+# Development settings minimize costs for non-production workloads
+# Suitable for: developer testing, schema development, integration tests
+
+# Instance class for database server
+# db.t3.micro: 1 vCPU, 1GB RAM - suitable for light development workloads
+db_instance_class = "db.t3.micro"
+
+# Initial storage allocation in GB
+db_allocated_storage = 20
+
+# Maximum storage for autoscaling (GB)
+# Database will automatically grow to this limit as data increases
+db_max_allocated_storage = 50
+
+# Multi-AZ deployment for automatic failover
+# Recommendation: false for dev (cost savings), true for prod (99.95% SLA)
+db_multi_az = false
+
+# Automated backup retention period (days)
+# Recommendation: 1 day for dev, 3 days for test, 7+ days for prod
+db_backup_retention_period = 1
+
+# Deletion protection
+# Recommendation: false for dev (allow easy teardown), true for prod
+db_deletion_protection = false
+
+# Skip final snapshot on database deletion
+# Recommendation: true for dev (faster cleanup), false for prod (safety)
+skip_final_snapshot = true
+
+# --------------------------------------------------------------------------
+# Database Instance Configuration - TEST/STAGING ENVIRONMENT (commented)
+# --------------------------------------------------------------------------
+# Uncomment and adjust for test/staging environment
+#
+# db_instance_class = "db.t3.small"     # 2 vCPU, 2GB RAM
+# db_allocated_storage = 50
+# db_max_allocated_storage = 200
+# db_multi_az = false                   # Optional multi-AZ for test
+# db_backup_retention_period = 3
+# db_deletion_protection = true
+# skip_final_snapshot = false
+
+# --------------------------------------------------------------------------
+# Database Instance Configuration - PRODUCTION ENVIRONMENT (commented)
+# --------------------------------------------------------------------------
+# Uncomment and adjust for production environment
+# Production settings ensure high availability and data durability
+#
+# db_instance_class = "db.r6g.large"    # 4 vCPU, 32GB RAM (memory-optimized)
+# # Alternative: db.t3.medium (2 vCPU, 4GB RAM) for lower-cost production
+# db_allocated_storage = 100            # Production baseline
+# db_max_allocated_storage = 500        # Room for growth
+# db_multi_az = true                    # High availability with automatic failover
+# db_backup_retention_period = 7        # Compliance requirement (7-30 days)
+# db_deletion_protection = true         # Prevent accidental deletion
+# skip_final_snapshot = false           # Snapshot before destroy
+
+# Backup window (UTC timezone)
+# Recommendation: Schedule during low-traffic hours
+# Format: "HH:MM-HH:MM" (must be at least 30 minutes)
+db_backup_window = "03:00-04:00"
+
+# Maintenance window (UTC timezone)
+# Recommendation: Schedule during low-traffic period (e.g., weekend)
+# Format: "ddd:HH:MM-ddd:HH:MM"
+db_maintenance_window = "sun:04:00-sun:05:00"
+
+# Enable storage encryption at rest
+# Recommendation: Always true for PCI-DSS compliance
+db_storage_encrypted = true
+
+# ============================================================================
+# VPC NETWORKING CONFIGURATION
+# ============================================================================
+
+# VPC CIDR block
+# Provides 65,536 IP addresses (10.0.0.0 - 10.0.255.255)
+# Adjust if integrating with existing VPC or peering requirements
+vpc_cidr = "10.0.0.0/16"
+
+# Public subnet CIDR blocks (one per availability zone)
+# 256 IP addresses each for load balancers, NAT gateways, and bastion hosts
+# Must be within VPC CIDR range
+public_subnet_cidrs = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+
+# Private subnet CIDR blocks (one per availability zone)
+# 256 IP addresses each for EKS worker nodes and RDS instances
+# Must be within VPC CIDR range and non-overlapping with public subnets
+private_subnet_cidrs = ["10.0.10.0/24", "10.0.20.0/24", "10.0.30.0/24"]
+
+# Enable NAT Gateway for private subnet internet access
+# Required for: EKS node OS updates, container image pulls, external API calls
+# Recommendation: true for all environments
+enable_nat_gateway = true
+
+# Enable DNS hostnames for RDS endpoint resolution
+# Required for: Database hostname resolution within VPC
+enable_dns_hostnames = true
+
+# Enable DNS support in VPC
+# Required for: Service discovery and DNS resolution
+enable_dns_support = true
+
+# ============================================================================
+# SECURITY AND ACCESS CONTROL CONFIGURATION
+# ============================================================================
+
+# CIDR blocks allowed to access resources
+# Recommendation: Restrict to corporate VPN CIDR or specific IP ranges in production
+# RFC 1918 private address ranges (for VPN access):
+#   - 10.0.0.0/8 (10.0.0.0 - 10.255.255.255)
+#   - 172.16.0.0/12 (172.16.0.0 - 172.31.255.255)
+#   - 192.168.0.0/16 (192.168.0.0 - 192.168.255.255)
+allowed_cidr_blocks = ["10.0.0.0/8", "172.16.0.0/12"]
+
+# Enable VPC Flow Logs for network traffic monitoring
+# Logs stored in CloudWatch for security analysis and troubleshooting
+# Recommendation: true for production, optional for dev (cost savings)
+enable_vpc_flow_logs = true
+
+# SSL/TLS enforcement mode for PostgreSQL connections
+# Options: "require" (SSL required), "verify-ca", "verify-full"
+# Recommendation: "require" for PCI-DSS compliance
+ssl_enforce_mode = "require"
+
+# ============================================================================
+# APPLICATION CONFIGURATION
+# ============================================================================
+
+# Application name for resource tagging and identification
+app_name = "carddemo"
+
+# Application version for deployment tracking
+# Recommendation: Use semantic versioning (major.minor.patch)
+app_version = "1.0.0"
+
+# Maximum database connections per application pod
+# Used for HikariCP connection pool sizing
+# Total DB connections = max_db_connections_per_pod × node_group_max_size × pods_per_node
+# Example: 10 connections × 3 nodes × 1 pod/node = 30 total connections
+# Recommendation: 10-20 for typical workloads
+max_db_connections_per_pod = 10
+
+# ============================================================================
+# RESOURCE TAGGING CONFIGURATION
+# ============================================================================
+
+# Common tags applied to all resources
+# Used for: cost allocation, resource management, compliance tracking
+tags = {
+  Project     = "CardDemo"
+  Environment = "development"
+  ManagedBy   = "Terraform"
+  CostCenter  = "Engineering"
+  Owner       = "platform-team@example.com"
+  Application = "CardDemo-Modernized"
+}
+
+# Additional custom tags (optional)
+# Add organization-specific tags as needed
+additional_tags = {}
+
+# Example additional tags for production:
+# additional_tags = {
+#   Compliance    = "PCI-DSS"
+#   BackupPolicy  = "Daily"
+#   DataSensitivity = "High"
+# }
+
+# ============================================================================
+# COST OPTIMIZATION CONFIGURATION
+# ============================================================================
+
+# Enhanced monitoring interval for RDS (seconds)
+# Values: 0 (disabled), 1, 5, 10, 15, 30, 60
+# Recommendation: 60 for production (detailed metrics), 0 for dev (cost savings)
+# Cost: $0.30/month per database instance when enabled
+monitoring_interval = 0
+
+# Enable deletion protection for critical resources
+# Prevents accidental deletion via Terraform or AWS Console
+# Recommendation: false for dev (easy teardown), true for prod (safety)
+enable_deletion_protection = false
+
+# ============================================================================
+# ENVIRONMENT-SPECIFIC CONFIGURATION EXAMPLES
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# DEVELOPMENT ENVIRONMENT - Complete Configuration Block
+# ----------------------------------------------------------------------------
+# Purpose: Cost-optimized setup for developer testing and CI/CD
+# Characteristics:
+#   - Single-AZ deployment (no redundancy)
+#   - Minimal instance sizes
+#   - Reduced backup retention
+#   - Deletion protection disabled
+# Estimated monthly cost: $150-200
+#
+# Copy these values to terraform.tfvars for development:
+# ----------------------------------------------------------------------------
+# environment = "dev"
+# cluster_name = "carddemo-eks-dev"
+# node_group_desired_capacity = 2
+# node_group_min_size = 1
+# node_group_max_size = 3
+# node_instance_types = ["t3.small"]
+# db_instance_class = "db.t3.micro"
+# db_allocated_storage = 20
+# db_max_allocated_storage = 50
+# db_multi_az = false
+# db_backup_retention_period = 1
+# db_deletion_protection = false
+# skip_final_snapshot = true
+# monitoring_interval = 0
+# enable_deletion_protection = false
+
+# ----------------------------------------------------------------------------
+# TEST/STAGING ENVIRONMENT - Complete Configuration Block
+# ----------------------------------------------------------------------------
+# Purpose: Pre-production validation and QA testing
+# Characteristics:
+#   - Single or Multi-AZ (optional)
+#   - Medium instance sizes
+#   - Moderate backup retention (3 days)
+#   - Deletion protection enabled
+# Estimated monthly cost: $300-400
+#
+# Copy these values to terraform.tfvars for test/staging:
+# ----------------------------------------------------------------------------
+# environment = "test"
+# cluster_name = "carddemo-eks-test"
+# node_group_desired_capacity = 2
+# node_group_min_size = 2
+# node_group_max_size = 5
+# node_instance_types = ["t3.medium"]
+# db_instance_class = "db.t3.small"
+# db_allocated_storage = 50
+# db_max_allocated_storage = 200
+# db_multi_az = false
+# db_backup_retention_period = 3
+# db_deletion_protection = true
+# skip_final_snapshot = false
+# monitoring_interval = 60
+# enable_deletion_protection = true
+
+# ----------------------------------------------------------------------------
+# PRODUCTION ENVIRONMENT - Complete Configuration Block
+# ----------------------------------------------------------------------------
+# Purpose: Production workload supporting 1,000+ concurrent users
+# Characteristics:
+#   - Multi-AZ deployment (99.95% SLA)
+#   - Large instance sizes
+#   - Extended backup retention (7+ days)
+#   - Deletion protection enabled
+#   - Enhanced monitoring enabled
+# Estimated monthly cost: $800-1200
+#
+# Copy these values to terraform.tfvars for production:
+# ----------------------------------------------------------------------------
+# environment = "prod"
+# cluster_name = "carddemo-eks-prod"
+# node_group_desired_capacity = 3
+# node_group_min_size = 2
+# node_group_max_size = 10
+# node_instance_types = ["t3.medium", "t3.large"]
+# db_instance_class = "db.r6g.large"
+# db_allocated_storage = 100
+# db_max_allocated_storage = 500
+# db_multi_az = true
+# db_backup_retention_period = 7
+# db_deletion_protection = true
+# skip_final_snapshot = false
+# monitoring_interval = 60
+# enable_deletion_protection = true
+# allowed_cidr_blocks = ["YOUR_CORPORATE_VPN_CIDR"]
+# enable_vpc_flow_logs = true
+
+# ============================================================================
+# SECURITY BEST PRACTICES
+# ============================================================================
+#
+# 1. Password Management:
+#    - NEVER commit terraform.tfvars with real passwords to Git
+#    - Use AWS Secrets Manager for production database credentials
+#    - Rotate passwords every 90 days
+#    - Example AWS CLI command to store password:
+#      aws secretsmanager create-secret --name carddemo/db/password \
+#        --secret-string "YOUR_STRONG_PASSWORD"
+#
+# 2. Access Control:
+#    - Restrict allowed_cidr_blocks to known IP ranges
+#    - Use VPN or AWS PrivateLink for database access in production
+#    - Enable AWS CloudTrail for infrastructure change auditing
+#    - Implement least-privilege IAM policies
+#
+# 3. Encryption:
+#    - Always enable db_storage_encrypted = true (PCI-DSS requirement)
+#    - Use ssl_enforce_mode = "require" for database connections
+#    - Enable encryption at rest for EKS node volumes
+#
+# 4. Backup and Recovery:
+#    - Test backup restoration procedures quarterly
+#    - Store critical backups in separate AWS region (cross-region replication)
+#    - Document RTO (Recovery Time Objective) and RPO (Recovery Point Objective)
+#
+# 5. Monitoring and Alerting:
+#    - Enable CloudWatch alarms for critical metrics (CPU, memory, disk)
+#    - Configure SNS notifications for security events
+#    - Review VPC Flow Logs for suspicious network activity
+#
+# 6. Compliance:
+#    - Document all configuration changes in change management system
+#    - Regular security audits using AWS Config and Security Hub
+#    - Maintain audit trail for PCI-DSS compliance
+#
+# ============================================================================
+# USAGE INSTRUCTIONS
+# ============================================================================
+#
+# Step 1: Copy this example file to terraform.tfvars
+# -------
+# $ cp terraform.tfvars.example terraform.tfvars
+#
+# Step 2: Edit terraform.tfvars with your specific values
+# -------
+# $ vim terraform.tfvars
+# OR
+# $ nano terraform.tfvars
+#
+# IMPORTANT: Update the following required values:
+#   - db_password (replace placeholder with strong password)
+#   - allowed_cidr_blocks (restrict to your network)
+#   - tags (update with your organization details)
+#
+# Step 3: Initialize Terraform
+# -------
+# $ terraform init
+#
+# This will:
+#   - Download required provider plugins (AWS, Kubernetes)
+#   - Initialize backend for state storage
+#   - Prepare working directory
+#
+# Step 4: Validate configuration
+# -------
+# $ terraform validate
+#
+# This checks for syntax errors and invalid references
+#
+# Step 5: Preview changes (dry-run)
+# -------
+# $ terraform plan
+#
+# Review the execution plan carefully before applying
+# Verify:
+#   - Correct resource counts
+#   - Expected instance sizes
+#   - Network configuration
+#   - Security group rules
+#
+# Step 6: Apply infrastructure changes
+# -------
+# $ terraform apply
+#
+# Type "yes" when prompted to confirm
+# Infrastructure provisioning takes approximately 15-20 minutes
+#
+# Step 7: Retrieve outputs for application deployment
+# -------
+# $ terraform output
+#
+# Use these outputs to configure:
+#   - kubectl (EKS cluster endpoint)
+#   - application.yml (RDS database endpoint)
+#   - k8s ConfigMap and Secret manifests
+#
+# Step 8: Configure kubectl access
+# -------
+# $ aws eks update-kubeconfig --region us-east-1 --name carddemo-eks-dev
+#
+# Verify cluster access:
+# $ kubectl get nodes
+#
+# ============================================================================
+# TROUBLESHOOTING TIPS
+# ============================================================================
+#
+# Issue: "Error: Invalid value for variable"
+# Solution: Check variables.tf for allowed values and validation rules
+#
+# Issue: "Error: Insufficient capacity in availability zone"
+# Solution: Try different AZs or instance types
+#
+# Issue: "Error: DB instance password does not meet complexity requirements"
+# Solution: Use password with minimum 16 characters, mixed case, numbers, symbols
+#
+# Issue: Terraform state lock timeout
+# Solution: Check DynamoDB table for stale locks, release manually if needed
+#
+# Issue: EKS node group creation timeout
+# Solution: Check IAM role permissions and subnet configurations
+#
+# For more help, see:
+#   - Project documentation: docs/deployment-guide.md
+#   - Terraform AWS Provider docs: https://registry.terraform.io/providers/hashicorp/aws
+#   - AWS EKS Best Practices: https://aws.github.io/aws-eks-best-practices/
+#
+# ============================================================================

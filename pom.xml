@@ -1,0 +1,628 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+         https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    
+    <!-- 
+        AWS CardDemo Modernized - Maven Project Descriptor
+        
+        This POM defines the complete Spring Boot 3.x project with Java 21 for the modernized
+        CardDemo application, migrated from COBOL/CICS/VSAM to Java/Spring Boot/PostgreSQL.
+        
+        Key Architecture Decisions:
+        - Spring Boot 3.3.0 with Java 21 LTS
+        - PostgreSQL 15+ relational database (replacing VSAM)
+        - Spring Security with JWT authentication (replacing RACF)
+        - Spring Batch for batch processing (replacing JCL jobs)
+        - RESTful APIs (replacing BMS 3270 screens)
+        
+        References:
+        - Technical Specification Section 0.5.1: Key Private and Public Packages
+        - Technical Specification Section 5.3: Technical Decisions
+        - Agent Action Plan Section 0.5.3: Maven pom.xml Structure
+    -->
+    
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.3.0</version>
+        <relativePath/>
+    </parent>
+    
+    <groupId>com.aws</groupId>
+    <artifactId>carddemo-modernized</artifactId>
+    <version>1.0.0</version>
+    <name>AWS CardDemo Modernized</name>
+    <description>Modernized credit card management application migrated from COBOL to Java 21</description>
+    
+    <properties>
+        <!-- Java Version Configuration -->
+        <java.version>21</java.version>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        
+        <!-- Dependency Versions - Explicit versions per section 0.5.1 -->
+        <mapstruct.version>1.5.5.Final</mapstruct.version>
+        <testcontainers.version>1.19.8</testcontainers.version>
+        <jwt.version>0.12.5</jwt.version>
+        <lombok.version>1.18.32</lombok.version>
+        <springdoc.version>2.5.0</springdoc.version>
+        <postgresql.version>42.7.3</postgresql.version>
+        <hikari.version>5.1.0</hikari.version>
+        <flyway.version>10.13.0</flyway.version>
+        <commons-lang3.version>3.14.0</commons-lang3.version>
+        <commons-text.version>1.12.0</commons-text.version>
+        <jackson.version>2.17.1</jackson.version>
+        <logstash-logback.version>7.4</logstash-logback.version>
+        <h2.version>2.2.224</h2.version>
+        <awaitility.version>4.2.1</awaitility.version>
+        <caffeine.version>3.1.8</caffeine.version>
+        <micrometer.version>1.13.0</micrometer.version>
+        <aws-sdk.version>2.25.62</aws-sdk.version>
+        <thymeleaf.version>3.1.2.RELEASE</thymeleaf.version>
+        <itext.version>7.2.5</itext.version>
+        
+        <!-- Plugin Versions -->
+        <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
+        <maven-surefire-plugin.version>3.2.5</maven-surefire-plugin.version>
+        <maven-failsafe-plugin.version>3.2.5</maven-failsafe-plugin.version>
+        <jacoco-maven-plugin.version>0.8.12</jacoco-maven-plugin.version>
+    </properties>
+    
+    <dependencies>
+        <!-- ===================================================================
+             SPRING BOOT STARTERS
+             Core Spring Boot components for web, data, security, and batch
+             =================================================================== -->
+        
+        <!-- Spring Boot Web Starter - REST API framework with embedded Tomcat -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        
+        <!-- Spring Data JPA Starter - ORM with Hibernate for database access -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        
+        <!-- Spring Security Starter - Authentication and authorization -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        
+        <!-- Spring Batch Starter - Batch processing framework replacing JCL jobs -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-batch</artifactId>
+        </dependency>
+        
+        <!-- Spring Validation Starter - Bean validation (JSR-380) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        
+        <!-- Spring Actuator Starter - Health checks, metrics, monitoring endpoints -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        
+        <!-- Spring Cache Starter - Caching abstraction for reference data -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-cache</artifactId>
+        </dependency>
+        
+        <!-- Caffeine Cache - High-performance caching library for Spring Cache -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+            <version>${caffeine.version}</version>
+        </dependency>
+        
+        <!-- Hibernate JCache - Second-level cache support for Hibernate ORM -->
+        <dependency>
+            <groupId>org.hibernate.orm</groupId>
+            <artifactId>hibernate-jcache</artifactId>
+            <version>6.5.2.Final</version>
+        </dependency>
+        
+        <!-- JCache API (JSR-107) - Java Caching API specification -->
+        <dependency>
+            <groupId>javax.cache</groupId>
+            <artifactId>cache-api</artifactId>
+            <version>1.1.1</version>
+        </dependency>
+        
+        <!-- Caffeine JCache - JCache (JSR-107) provider implementation using Caffeine -->
+        <!-- Provides JCacheRegionFactory support for Hibernate second-level cache -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>jcache</artifactId>
+            <version>${caffeine.version}</version>
+        </dependency>
+        
+        <!-- ===================================================================
+             DATABASE & ORM
+             PostgreSQL driver, connection pooling, and database migrations
+             =================================================================== -->
+        
+        <!-- PostgreSQL JDBC Driver - Replaces VSAM data access -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>${postgresql.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+        
+        <!-- HikariCP Connection Pool - High-performance JDBC connection pooling -->
+        <dependency>
+            <groupId>com.zaxxer</groupId>
+            <artifactId>HikariCP</artifactId>
+            <version>${hikari.version}</version>
+        </dependency>
+        
+        <!-- Flyway Core - Database migration and versioning -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+            <version>${flyway.version}</version>
+        </dependency>
+        
+        <!-- Flyway PostgreSQL Support - PostgreSQL-specific migrations -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+            <version>${flyway.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+        
+        <!-- H2 Database - In-memory database for local development and testing -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <version>${h2.version}</version>
+            <scope>test</scope>
+        </dependency>
+        
+        <!-- ===================================================================
+             SECURITY & JWT
+             JWT token generation/validation, password encryption
+             =================================================================== -->
+        
+        <!-- JWT API - JSON Web Token interface definitions -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>${jwt.version}</version>
+        </dependency>
+        
+        <!-- JWT Implementation - Core JWT token processing -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>${jwt.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+        
+        <!-- JWT Jackson Integration - JSON serialization for JWT -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <version>${jwt.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+        
+        <!-- ===================================================================
+             MAPPING & CODE GENERATION
+             MapStruct for DTO mapping, Lombok for boilerplate reduction
+             =================================================================== -->
+        
+        <!-- MapStruct - Entity to DTO mapping -->
+        <dependency>
+            <groupId>org.mapstruct</groupId>
+            <artifactId>mapstruct</artifactId>
+            <version>${mapstruct.version}</version>
+        </dependency>
+        
+        <!-- Lombok - Reduce boilerplate code (getters, setters, constructors) -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>${lombok.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        
+        <!-- ===================================================================
+             API DOCUMENTATION
+             OpenAPI/Swagger UI for REST API documentation
+             =================================================================== -->
+        
+        <!-- SpringDoc OpenAPI UI - Swagger UI + OpenAPI 3.0 documentation -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${springdoc.version}</version>
+        </dependency>
+        
+        <!-- ===================================================================
+             MONITORING & METRICS
+             Prometheus metrics export for observability
+             =================================================================== -->
+        
+        <!-- Micrometer Prometheus Registry - Prometheus metrics integration -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+            <version>${micrometer.version}</version>
+        </dependency>
+        
+        <!-- ===================================================================
+             UTILITIES
+             Common utility libraries for string manipulation, JSON, logging
+             =================================================================== -->
+        
+        <!-- Apache Commons Lang3 - Common utility methods (StringUtils, etc.) -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>${commons-lang3.version}</version>
+        </dependency>
+        
+        <!-- Apache Commons Text - Text manipulation utilities -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-text</artifactId>
+            <version>${commons-text.version}</version>
+        </dependency>
+        
+        <!-- Jackson Databind - JSON serialization/deserialization -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
+        
+        <!-- Jackson JSR310 - Java 8 date/time support in Jackson -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
+        
+        <!-- Logstash Logback Encoder - JSON log formatting for CloudWatch -->
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>${logstash-logback.version}</version>
+        </dependency>
+        
+        <!-- ===================================================================
+             DOCUMENT GENERATION
+             Thymeleaf template engine and iText PDF library for statement generation
+             =================================================================== -->
+        
+        <!-- Thymeleaf Template Engine - HTML template processing for statement generation -->
+        <dependency>
+            <groupId>org.thymeleaf</groupId>
+            <artifactId>thymeleaf</artifactId>
+            <version>${thymeleaf.version}</version>
+        </dependency>
+        
+        <!-- Thymeleaf Spring Integration - Spring context integration for templates -->
+        <dependency>
+            <groupId>org.thymeleaf</groupId>
+            <artifactId>thymeleaf-spring6</artifactId>
+            <version>${thymeleaf.version}</version>
+        </dependency>
+        
+        <!-- iText Core - PDF generation library for statement PDFs -->
+        <dependency>
+            <groupId>com.itextpdf</groupId>
+            <artifactId>itext7-core</artifactId>
+            <version>${itext.version}</version>
+            <type>pom</type>
+        </dependency>
+        
+        <!-- iText HTML2PDF - Convert HTML to PDF for statement generation -->
+        <dependency>
+            <groupId>com.itextpdf</groupId>
+            <artifactId>html2pdf</artifactId>
+            <version>4.0.5</version>
+        </dependency>
+        
+        <!-- ===================================================================
+             AWS SDK
+             AWS services integration (Secrets Manager, CloudWatch, RDS, S3)
+             =================================================================== -->
+        
+        <!-- AWS Secrets Manager SDK - Secure credential storage -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>secretsmanager</artifactId>
+            <version>${aws-sdk.version}</version>
+        </dependency>
+        
+        <!-- AWS CloudWatch SDK - Metrics and log aggregation -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>cloudwatch</artifactId>
+            <version>${aws-sdk.version}</version>
+        </dependency>
+        
+        <!-- AWS RDS SDK - RDS database utilities -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>rds</artifactId>
+            <version>${aws-sdk.version}</version>
+        </dependency>
+        
+        <!-- AWS S3 SDK - S3 object storage for statement archival -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <version>${aws-sdk.version}</version>
+        </dependency>
+        
+        <!-- ===================================================================
+             TESTING
+             JUnit 5, Mockito, Spring Test, Testcontainers
+             =================================================================== -->
+        
+        <!-- Spring Boot Test Starter - JUnit 5, Mockito, Spring Test -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        
+        <!-- Spring Security Test - Security testing utilities -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        
+        <!-- Spring Batch Test - Batch job testing utilities -->
+        <dependency>
+            <groupId>org.springframework.batch</groupId>
+            <artifactId>spring-batch-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        
+        <!-- Testcontainers Core - Docker containers for integration testing -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        
+        <!-- Testcontainers PostgreSQL - PostgreSQL container for integration tests -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        
+        <!-- Testcontainers JUnit 5 - JUnit 5 integration for Testcontainers -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        
+        <!-- Awaitility - Asynchronous testing utilities -->
+        <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility</artifactId>
+            <version>${awaitility.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+    
+    <build>
+        <plugins>
+            <!-- ===================================================================
+                 SPRING BOOT MAVEN PLUGIN
+                 Packages application as executable JAR with embedded Tomcat
+                 =================================================================== -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <!-- Exclude Lombok from packaged JAR (compile-time only) -->
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            
+            <!-- ===================================================================
+                 MAVEN COMPILER PLUGIN
+                 Configures Java 21 compilation with annotation processors
+                 =================================================================== -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>${maven-compiler-plugin.version}</version>
+                <configuration>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                    <encoding>${project.build.sourceEncoding}</encoding>
+                    <annotationProcessorPaths>
+                        <!-- MapStruct annotation processor for DTO mapping -->
+                        <path>
+                            <groupId>org.mapstruct</groupId>
+                            <artifactId>mapstruct-processor</artifactId>
+                            <version>${mapstruct.version}</version>
+                        </path>
+                        <!-- Lombok annotation processor for code generation -->
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                        <!-- Lombok-MapStruct binding for compatibility -->
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok-mapstruct-binding</artifactId>
+                            <version>0.2.0</version>
+                        </path>
+                    </annotationProcessorPaths>
+                    <compilerArgs>
+                        <arg>-parameters</arg>
+                        <arg>-Amapstruct.defaultComponentModel=spring</arg>
+                    </compilerArgs>
+                </configuration>
+            </plugin>
+            
+            <!-- ===================================================================
+                 MAVEN SUREFIRE PLUGIN
+                 Executes unit tests during 'mvn test' phase
+                 =================================================================== -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${maven-surefire-plugin.version}</version>
+                <configuration>
+                    <includes>
+                        <include>**/*Test.java</include>
+                        <include>**/*Tests.java</include>
+                    </includes>
+                    <excludes>
+                        <exclude>**/*IntegrationTest.java</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+            
+            <!-- ===================================================================
+                 MAVEN FAILSAFE PLUGIN
+                 Executes integration tests during 'mvn verify' phase
+                 =================================================================== -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>${maven-failsafe-plugin.version}</version>
+                <configuration>
+                    <includes>
+                        <include>**/*IntegrationTest.java</include>
+                        <include>**/*IT.java</include>
+                    </includes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            
+            <!-- ===================================================================
+                 JACOCO MAVEN PLUGIN
+                 Code coverage reporting for quality metrics
+                 Target: ≥80% line coverage, ≥70% branch coverage
+                 =================================================================== -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco-maven-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>check</id>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.80</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>BRANCH</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.70</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+    
+    <!-- ===================================================================
+         MAVEN PROFILES
+         Environment-specific configurations (dev, test, prod)
+         =================================================================== -->
+    <profiles>
+        <!-- Development Profile - Active by default -->
+        <profile>
+            <id>dev</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <properties>
+                <spring.profiles.active>dev</spring.profiles.active>
+            </properties>
+        </profile>
+        
+        <!-- Test Profile - For automated testing environments -->
+        <profile>
+            <id>test</id>
+            <properties>
+                <spring.profiles.active>test</spring.profiles.active>
+            </properties>
+        </profile>
+        
+        <!-- Production Profile - For AWS EKS deployment -->
+        <profile>
+            <id>prod</id>
+            <properties>
+                <spring.profiles.active>prod</spring.profiles.active>
+            </properties>
+        </profile>
+    </profiles>
+</project>

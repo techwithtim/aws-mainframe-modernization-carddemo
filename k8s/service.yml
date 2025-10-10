@@ -1,0 +1,148 @@
+# Kubernetes Service Manifest for CardDemo Modernized Application
+# Purpose: LoadBalancer service exposing the CardDemo Java application to external traffic
+# Migrated from: AWS CardDemo COBOL mainframe application (CICS transaction server)
+# Technical Specification Reference: Section 5.1 High-Level Architecture
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: carddemo-service
+  namespace: carddemo
+  labels:
+    app: carddemo
+    component: application
+    tier: backend
+    version: v1.0.0
+    managed-by: kubernetes
+  annotations:
+    # AWS Elastic Load Balancer Configuration
+    # These annotations configure the AWS ELB for production-grade traffic distribution
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"  # Network Load Balancer for Layer 4
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "tcp"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: "http"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: "/actuator/health"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-port: "8080"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-interval: "10"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-timeout: "5"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-healthy-threshold: "2"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-unhealthy-threshold: "3"
+    
+    # Access Logging for Compliance and Auditing
+    service.beta.kubernetes.io/aws-load-balancer-access-log-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-access-log-s3-bucket-name: "carddemo-elb-logs"
+    service.beta.kubernetes.io/aws-load-balancer-access-log-s3-bucket-prefix: "carddemo-service"
+    
+    # Connection Settings
+    service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout: "60"
+    service.beta.kubernetes.io/aws-load-balancer-connection-draining-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-connection-draining-timeout: "30"
+    
+    # TLS/SSL Configuration (for HTTPS termination at load balancer)
+    # Uncomment and configure when SSL certificate is available
+    # service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "arn:aws:acm:region:account-id:certificate/certificate-id"
+    # service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "443"
+    # service.beta.kubernetes.io/aws-load-balancer-ssl-negotiation-policy: "ELBSecurityPolicy-TLS-1-2-2017-01"
+    
+    # Additional metadata for documentation and tracking
+    description: "LoadBalancer service for CardDemo REST API endpoints"
+    contact: "platform-team@example.com"
+    documentation: "https://github.com/aws-samples/aws-card-demo-modernized/blob/main/docs/deployment-guide.md"
+
+spec:
+  # Service Type: LoadBalancer
+  # Provisions an AWS Elastic Load Balancer to distribute external traffic to application pods
+  # Replaces mainframe CICS transaction routing with cloud-native load balancing
+  type: LoadBalancer
+  
+  # Selector: Matches pods with label app=carddemo
+  # This selector MUST match the labels defined in k8s/deployment.yml pod template
+  selector:
+    app: carddemo
+  
+  # Session Affinity: ClientIP
+  # Ensures requests from the same client IP are routed to the same pod
+  # Useful for maintaining session context in stateful interactions
+  # Timeout: 3600 seconds (1 hour) - matches JWT token expiration
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600
+  
+  # Port Configuration
+  # Maps external port 80 (public internet) to container port 8080 (Spring Boot application)
+  ports:
+    # HTTP Port (Primary)
+    - name: http
+      protocol: TCP
+      port: 80              # External port exposed by LoadBalancer (public internet)
+      targetPort: 8080      # Container port where Spring Boot application listens
+      # nodePort: 30080     # Optional: Uncomment to specify a fixed NodePort (30000-32767)
+    
+    # Actuator Monitoring Port (Optional - for health checks)
+    # Uncomment if actuator needs to be exposed separately
+    # - name: actuator
+    #   protocol: TCP
+    #   port: 8081
+    #   targetPort: 8080
+    
+    # HTTPS Port (Future Enhancement)
+    # Uncomment when SSL/TLS certificate is configured
+    # - name: https
+    #   protocol: TCP
+    #   port: 443
+    #   targetPort: 8080
+  
+  # External Traffic Policy: Cluster (default)
+  # Cluster: Load balances across all nodes, may perform additional hop
+  # Local: Routes traffic only to pods on the node receiving traffic (preserves source IP)
+  # Using Cluster for better load distribution across availability zones
+  externalTrafficPolicy: Cluster
+  
+  # IP Address Allocation
+  # loadBalancerIP: "x.x.x.x"  # Optional: Specify a pre-allocated Elastic IP
+  # loadBalancerSourceRanges:   # Optional: Restrict access to specific CIDR blocks
+  #   - "0.0.0.0/0"  # Allow all (default) - RESTRICT IN PRODUCTION
+
+---
+# Service Monitor for Prometheus (Optional)
+# Uncomment if Prometheus Operator is installed for metrics collection
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: carddemo-metrics
+#   namespace: carddemo
+#   labels:
+#     app: carddemo
+#     component: metrics
+# spec:
+#   type: ClusterIP
+#   selector:
+#     app: carddemo
+#   ports:
+#     - name: metrics
+#       protocol: TCP
+#       port: 8080
+#       targetPort: 8080
+
+---
+# Headless Service for StatefulSet (Future Enhancement)
+# Uncomment if migrating to StatefulSet for persistent pod identities
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: carddemo-headless
+#   namespace: carddemo
+#   labels:
+#     app: carddemo
+#     component: headless
+# spec:
+#   type: ClusterIP
+#   clusterIP: None
+#   selector:
+#     app: carddemo
+#   ports:
+#     - name: http
+#       protocol: TCP
+#       port: 8080
+#       targetPort: 8080

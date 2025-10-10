@@ -1,0 +1,253 @@
+# ==============================================================================
+# Spring Boot Test Profile Configuration
+# ==============================================================================
+# Purpose: Integration testing configuration with Testcontainers PostgreSQL
+# Profile: test (activated via @ActiveProfiles("test") or spring.profiles.active=test)
+# Usage: Provides test-specific settings for JUnit 5 integration tests with
+#        Testcontainers, automatic schema generation, transaction rollback,
+#        and enhanced logging for test debugging
+# ==============================================================================
+
+spring:
+  # Application configuration
+  application:
+    name: carddemo-modernized-test
+
+  # Datasource configuration for Testcontainers
+  # NOTE: The actual JDBC URL is dynamically provided by @Container PostgreSQLContainer
+  # in test classes. spring.test.database.replace=none ensures Spring Boot uses
+  # the Testcontainers database instead of trying to replace it with an embedded database
+  datasource:
+    # Dynamic URL - resolved from PostgreSQLContainer.getJdbcUrl()
+    # Test classes should use: @DynamicPropertySource to inject container URL
+    url: jdbc:postgresql://localhost:5432/testdb
+    username: test
+    password: test
+    driver-class-name: org.postgresql.Driver
+    
+    # HikariCP connection pool configuration for test performance
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 10000
+      idle-timeout: 300000
+      max-lifetime: 600000
+      pool-name: CarddemoTestPool
+      auto-commit: false
+
+  # Database initialization strategy
+  # Replace embedded database setting - CRITICAL for Testcontainers
+  # This ensures Spring Boot doesn't try to use H2 in-memory database
+  test:
+    database:
+      replace: none
+
+  # JPA/Hibernate configuration for testing
+  jpa:
+    # DDL auto strategy: create-drop
+    # Creates schema from JPA entities at test startup, drops after test completion
+    # This provides clean schema state for each test run without Flyway migrations
+    hibernate:
+      ddl-auto: create-drop
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+        implicit-strategy: org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy
+    
+    # Show SQL statements in test logs for debugging
+    show-sql: true
+    
+    # JPA properties
+    properties:
+      hibernate:
+        # PostgreSQL-specific dialect
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        
+        # Format SQL output for readability in logs
+        format_sql: true
+        
+        # Use JDBC batching for better test performance
+        jdbc:
+          batch_size: 10
+          fetch_size: 50
+        
+        # Default batch fetch size for lazy loading
+        default_batch_fetch_size: 10
+        
+        # Enable SQL comments in generated statements for debugging
+        use_sql_comments: true
+        
+        # Statistics for performance analysis during tests
+        generate_statistics: false
+        
+        # Second-level cache disabled for test isolation
+        cache:
+          use_second_level_cache: false
+          use_query_cache: false
+        
+        # JDBC timezone configuration
+        jdbc:
+          time_zone: UTC
+
+  # Flyway migration configuration
+  # DISABLED for test profile - schema created by Hibernate DDL auto
+  # Tests control schema initialization through @Sql scripts or entity creation
+  flyway:
+    enabled: false
+    # Locations left for reference if tests explicitly enable Flyway
+    locations: classpath:db/migration
+
+  # Spring Batch configuration for batch job tests
+  batch:
+    jdbc:
+      # Initialize Spring Batch schema for batch job testing
+      initialize-schema: always
+      # Table prefix for batch metadata tables
+      table-prefix: BATCH_
+    job:
+      # Prevent auto-run of batch jobs on test startup
+      enabled: false
+
+  # Transaction management for tests
+  # @Transactional tests will rollback by default
+  transaction:
+    default-timeout: 30
+    rollback-on-commit-failure: true
+
+  # Spring Security configuration for tests
+  # NOTE: spring.security.user properties REMOVED to prevent auto-configuration
+  # from creating a default SecurityFilterChain that conflicts with our custom
+  # SecurityConfig bean. Tests should use the application's SecurityConfig which
+  # includes JwtAuthenticationFilter and proper permitAll() rules for public endpoints.
+  # Test users are seeded in @BeforeEach methods with UserRepository for integration tests.
+
+# Server configuration for test context
+server:
+  port: 0  # Random port assignment for parallel test execution
+  servlet:
+    context-path: /
+  error:
+    include-message: always
+    include-binding-errors: always
+    include-stacktrace: always
+    include-exception: true
+
+# Management and actuator endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: false  # Disabled for test performance
+
+# Logging configuration for test execution
+logging:
+  level:
+    # Application package - DEBUG for detailed test execution logs
+    com.aws.carddemo: DEBUG
+    
+    # Spring Framework - INFO to reduce noise
+    org.springframework: INFO
+    org.springframework.web: INFO
+    org.springframework.security: DEBUG
+    org.springframework.transaction: DEBUG
+    org.springframework.test: INFO
+    
+    # Hibernate SQL logging - DEBUG to see all SQL statements
+    org.hibernate.SQL: DEBUG
+    # Hibernate SQL parameter binding - TRACE to see parameter values
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.hibernate.engine.transaction: DEBUG
+    
+    # Testcontainers - INFO for container lifecycle logs
+    org.testcontainers: INFO
+    # Docker client - WARN to reduce verbosity
+    com.github.dockerjava: WARN
+    
+    # HikariCP connection pool - DEBUG for connection management visibility
+    com.zaxxer.hikari: DEBUG
+    
+    # PostgreSQL JDBC driver - INFO for connection details
+    org.postgresql: INFO
+    
+    # Spring Batch - DEBUG for batch job test visibility
+    org.springframework.batch: DEBUG
+    
+    # Test-specific loggers
+    org.junit: INFO
+    org.mockito: WARN
+
+  # Log pattern for console output
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+    level: "%5p"
+
+# ==============================================================================
+# Test-Specific Application Properties
+# ==============================================================================
+
+# JWT configuration for security tests
+jwt:
+  secret: test-secret-key-for-jwt-token-signing-minimum-256-bits-required
+  expiration: 3600000  # 1 hour in milliseconds
+
+# Test data configuration
+test:
+  data:
+    # Load test data from SQL scripts
+    enabled: true
+    # Test data scripts location
+    locations: classpath:test-data/
+
+# Performance test thresholds
+performance:
+  # Maximum acceptable response time for API endpoints (ms)
+  max-response-time: 200
+  # Maximum acceptable database query time (ms)
+  max-query-time: 50
+
+# ==============================================================================
+# Testcontainers-Specific Notes
+# ==============================================================================
+# 1. Test classes should use @DynamicPropertySource to inject container properties:
+#
+#    @Testcontainers
+#    @SpringBootTest
+#    class MyIntegrationTest {
+#        @Container
+#        static PostgreSQLContainer<?> postgres = 
+#            new PostgreSQLContainer<>("postgres:15-alpine");
+#        
+#        @DynamicPropertySource
+#        static void configureProperties(DynamicPropertyRegistry registry) {
+#            registry.add("spring.datasource.url", postgres::getJdbcUrl);
+#            registry.add("spring.datasource.username", postgres::getUsername);
+#            registry.add("spring.datasource.password", postgres::getPassword);
+#        }
+#    }
+#
+# 2. Transaction Rollback Behavior:
+#    - @Transactional on test methods automatically rolls back after each test
+#    - This ensures test data isolation without manual cleanup
+#    - Use @Commit annotation to override rollback behavior if needed
+#
+# 3. Schema Generation:
+#    - Hibernate creates schema from @Entity classes (ddl-auto: create-drop)
+#    - Schema is dropped after test context shutdown
+#    - No Flyway migrations applied (flyway.enabled: false)
+#
+# 4. Test Data Loading:
+#    - Use @Sql annotation to load test data from SQL scripts
+#    - Example: @Sql("/test-data/accounts.sql")
+#    - Or use @DataJpaTest for repository tests with automatic data loading
+#
+# 5. Logging:
+#    - SQL statements logged at DEBUG level with formatted output
+#    - Parameter values logged at TRACE level for debugging
+#    - Set logging.level.com.aws.carddemo=TRACE for maximum visibility
+# ==============================================================================
