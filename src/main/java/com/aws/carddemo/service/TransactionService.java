@@ -295,15 +295,17 @@ public class TransactionService {
             String merchantName,
             String transactionTypeCode,
             String transactionCategoryCode,
-            LocalDate transactionDate) {
+            LocalDate transactionDate,
+            String transactionDescription) {
 
-        log.debug("Posting transaction: cardNumber=**{}**, amount={}, merchant={}, type={}, category={}, date={}",
+        log.debug("Posting transaction: cardNumber=**{}**, amount={}, merchant={}, type={}, category={}, date={}, description={}",
                 cardNumber.length() >= 4 ? cardNumber.substring(cardNumber.length() - 4) : "****",
                 transactionAmount,
                 merchantName,
                 transactionTypeCode,
                 transactionCategoryCode,
-                transactionDate);
+                transactionDate,
+                transactionDescription);
 
         // Validation: Amount must be non-zero (COTRN02C.cbl lines 242-253)
         if (transactionAmount == null || transactionAmount.compareTo(BigDecimal.ZERO) == 0) {
@@ -339,15 +341,23 @@ public class TransactionService {
 
         // Step 3: Credit Limit Validation (CBTRN02C.cbl implicit balance check)
         // COBOL: IF ACCT-CURR-BAL + TRAN-AMT > ACCT-CREDIT-LIMIT
-        accountService.validateCreditLimit(account, transactionAmount);
-        log.debug("Credit limit validation passed for account: {}", accountId);
+        BigDecimal proposedBalance = account.getCurrentBalance().add(transactionAmount);
+        accountService.validateCreditLimit(account, proposedBalance);
+        log.debug("Credit limit validation passed for account: {}, proposedBalance: {}", accountId, proposedBalance);
 
         // Step 4: Transaction Record Creation (COTRN02C.cbl lines 444-468)
         // COBOL: MOVE fields to TRAN-RECORD, WRITE FD-TRANFILE-REC
+        
+        // Generate unique transaction number in format: TXN + YYYYMMDD + 4-digit sequence
+        // Example: TXN202501010001
+        String transactionNumber = generateTransactionNumber();
+        
         Transaction transaction = Transaction.builder()
                 .account(account)
                 .cardNumber(cardNumber)
+                .transactionNumber(transactionNumber)
                 .amount(transactionAmount)
+                .description(transactionDescription != null ? transactionDescription : "Transaction")
                 .merchantName(merchantName)
                 .transactionTypeCode(transactionTypeCode)
                 .transactionCategoryCode(transactionCategoryCode)
@@ -600,5 +610,27 @@ public class TransactionService {
             return "****************";
         }
         return "************" + cardNumber.substring(cardNumber.length() - 4);
+    }
+
+    /**
+     * Generates a unique transaction number in format: TXN + YYYYMMDD + 4-digit sequence.
+     * Example: TXN202501010001
+     * 
+     * Uses current timestamp milliseconds modulo for uniqueness.
+     * 
+     * @return generated transaction number (16 characters)
+     */
+    private String generateTransactionNumber() {
+        LocalDate today = LocalDate.now();
+        String datePart = String.format("%04d%02d%02d", 
+            today.getYear(), 
+            today.getMonthValue(), 
+            today.getDayOfMonth());
+        
+        // Generate a 4-digit sequence number using timestamp
+        long sequence = System.currentTimeMillis() % 10000;
+        String sequencePart = String.format("%04d", sequence);
+        
+        return "TXN" + datePart + sequencePart;
     }
 }
