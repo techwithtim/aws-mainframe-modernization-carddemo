@@ -7,7 +7,7 @@ package com.aws.carddemo.unit.controller;
 
 import com.aws.carddemo.controller.PaymentController;
 import com.aws.carddemo.dto.request.PaymentRequest;
-import com.aws.carddemo.dto.response.TransactionResponse;
+import com.aws.carddemo.dto.response.PaymentResponse;
 import com.aws.carddemo.exception.InsufficientFundsException;
 import com.aws.carddemo.exception.InvalidInputException;
 import com.aws.carddemo.exception.ResourceNotFoundException;
@@ -19,9 +19,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
@@ -33,6 +35,8 @@ import static org.hamcrest.Matchers.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -45,11 +49,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * (map names COBIL00/COBIL0A) for bill payment processing with account balance updates.
  * 
  * <p><b>Test Strategy:</b></p>
- * This test class uses {@code @WebMvcTest(PaymentController.class)} annotation for
- * focused controller testing, loading only the web layer components (PaymentController,
- * filters, exception handlers) without full application context. PaymentService is
- * mocked with {@code @MockBean} to isolate controller behavior testing from service
- * layer implementation.
+ * This test class uses {@code @SpringBootTest} with {@code @AutoConfigureMockMvc} annotations
+ * for full application context testing. PaymentService is mocked with {@code @MockBean} to
+ * isolate controller behavior testing from service layer implementation. This approach matches
+ * other controller tests and ensures proper bean configuration including JPA, batch, and
+ * security components.
  * 
  * <p><b>Testing Approach:</b></p>
  * Tests simulate HTTP POST requests using MockMvc, verifying:
@@ -110,7 +114,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * <p><b>JSON Response Validation:</b></p>
  * Tests use JsonPath assertions to validate response structure:
  * <ul>
- *   <li>{@code $.transaction_id} - Payment transaction ID from database insert</li>
+ *   <li>{@code $.transactionId} - Payment transaction ID from database insert</li>
  *   <li>{@code $.transaction_number} - Transaction number string for display</li>
  *   <li>{@code $.amount} - Payment amount as BigDecimal with 2 decimal places</li>
  *   <li>{@code $.transaction_type_code} - Must equal '02' for payment type</li>
@@ -170,7 +174,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @version 1.0.0
  * @since 1.0.0
  */
-@WebMvcTest(PaymentController.class)
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
 @DisplayName("PaymentController Unit Tests - Bill Payment Processing (COBIL00C.cbl)")
 public class PaymentControllerTest {
 
@@ -184,6 +190,7 @@ public class PaymentControllerTest {
     private PaymentService paymentService;
 
     private static final Long TEST_ACCOUNT_ID = 1234567890L;
+    private static final String TEST_ACCOUNT_NUMBER = "0001234567890";
     private static final String TEST_CARD_NUMBER_MASKED = "************9855";
     private static final BigDecimal TEST_PAYMENT_AMOUNT = new BigDecimal("100.50");
     private static final BigDecimal TEST_BALANCE = new BigDecimal("1250.75");
@@ -214,7 +221,7 @@ public class PaymentControllerTest {
      * <p><b>Verification:</b>
      * <ul>
      *   <li>HTTP status 200 OK</li>
-     *   <li>Response contains transaction_id for payment record</li>
+     *   <li>Response contains transactionId for payment record</li>
      *   <li>Response contains transaction_number string representation</li>
      *   <li>Payment amount matches request amount with 2 decimal places</li>
      *   <li>Transaction type code equals '02' for payment transaction</li>
@@ -233,18 +240,17 @@ public class PaymentControllerTest {
                 .confirmationFlag("Y")  // Confirmation = 'Y' (COBOL line 174-176)
                 .build();
 
-        // Arrange: Create transaction response matching successful payment processing
-        TransactionResponse mockResponse = TransactionResponse.builder()
+        // Arrange: Create payment response matching successful payment processing
+        PaymentResponse mockResponse = PaymentResponse.builder()
+                .confirmationNumber(UUID.randomUUID().toString())  // Generated confirmation number
+                .accountId(TEST_ACCOUNT_ID)  // Account identifier
+                .accountNumber(TEST_ACCOUNT_NUMBER)  // Account number string
+                .paymentAmount(TEST_PAYMENT_AMOUNT)  // Payment amount processed
+                .previousBalance(new BigDecimal("500.00"))  // Balance before payment
+                .newBalance(new BigDecimal("399.50"))  // Balance after payment (500.00 - 100.50)
+                .paymentDate(LocalDate.now())  // Payment effective date
                 .transactionId(987654321L)  // Generated transaction ID
-                .transactionNumber("0000000987654321")  // Transaction number string
-                .amount(TEST_PAYMENT_AMOUNT)  // Payment amount (negative in DB, positive in response)
-                .transactionTypeCode("02")  // Payment type code (COBOL line 220)
-                .transactionCategoryCode("0002")  // Payment category (COBOL line 221)
-                .transactionSource("POS TERM")  // Payment source (COBOL line 222)
-                .description("BILL PAYMENT - ONLINE")  // Payment description (COBOL line 223)
-                .cardNumberMasked(TEST_CARD_NUMBER_MASKED)  // Masked card number (last 4 digits)
-                .originalTimestamp(LocalDateTime.now())
-                .processingTimestamp(LocalDateTime.now())
+                .message("Payment processed successfully")  // Success message
                 .build();
 
         // Arrange: Mock PaymentService to return successful payment response
@@ -253,31 +259,32 @@ public class PaymentControllerTest {
 
         // Act & Assert: Execute POST request and verify response
         mockMvc.perform(post(PAYMENT_ENDPOINT, TEST_ACCOUNT_ID)
+                        .with(user("testuser").roles("USER"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(paymentRequest)))
                 // Assert: HTTP 200 OK status
                 .andExpect(status().isOk())
                 // Assert: Response Content-Type is application/json
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                // Assert: Transaction ID exists and is positive
-                .andExpect(jsonPath("$.transaction_id").value(987654321L))
-                // Assert: Transaction number string representation
-                .andExpect(jsonPath("$.transaction_number").value("0000000987654321"))
+                // Assert: Confirmation number exists
+                .andExpect(jsonPath("$.confirmationNumber").exists())
+                // Assert: Account ID matches request
+                .andExpect(jsonPath("$.accountId").value(TEST_ACCOUNT_ID))
+                // Assert: Account number is present
+                .andExpect(jsonPath("$.accountNumber").value(TEST_ACCOUNT_NUMBER))
                 // Assert: Payment amount matches request with 2 decimal places
-                .andExpect(jsonPath("$.amount").value(100.50))
-                // Assert: Transaction type code is '02' for payment (COBOL line 220)
-                .andExpect(jsonPath("$.transaction_type_code").value("02"))
-                // Assert: Transaction category code is '0002' for payment (COBOL line 221)
-                .andExpect(jsonPath("$.transaction_category_code").value("0002"))
-                // Assert: Transaction source is "POS TERM" (COBOL line 222)
-                .andExpect(jsonPath("$.transaction_source").value("POS TERM"))
-                // Assert: Description matches COBOL payment description (line 223)
-                .andExpect(jsonPath("$.description").value("BILL PAYMENT - ONLINE"))
-                // Assert: Card number is masked (PCI-DSS compliance)
-                .andExpect(jsonPath("$.card_number_masked").value(TEST_CARD_NUMBER_MASKED))
-                // Assert: Timestamps are present
-                .andExpect(jsonPath("$.original_timestamp").exists())
-                .andExpect(jsonPath("$.processing_timestamp").exists());
+                .andExpect(jsonPath("$.paymentAmount").value(100.50))
+                // Assert: Previous balance is correct (500.00)
+                .andExpect(jsonPath("$.previousBalance").value(500.00))
+                // Assert: New balance shows deduction (500.00 - 100.50 = 399.50)
+                .andExpect(jsonPath("$.newBalance").value(399.50))
+                // Assert: Payment date is present
+                .andExpect(jsonPath("$.paymentDate").exists())
+                // Assert: Transaction ID exists and is positive
+                .andExpect(jsonPath("$.transactionId").value(987654321L))
+                // Assert: Success message is present
+                .andExpect(jsonPath("$.message").value("Payment processed successfully"));
     }
 
     /**
@@ -312,6 +319,8 @@ public class PaymentControllerTest {
 
         // Act & Assert: Execute POST request and verify 404 response
         mockMvc.perform(post(PAYMENT_ENDPOINT, 9999999999L)
+                        .with(user("testuser").roles("USER"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(paymentRequest)))
                 // Assert: HTTP 404 NOT FOUND status
@@ -349,6 +358,8 @@ public class PaymentControllerTest {
 
         // Act & Assert: Execute POST request and verify 400 response
         mockMvc.perform(post(PAYMENT_ENDPOINT, TEST_ACCOUNT_ID)
+                        .with(user("testuser").roles("USER"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(paymentRequest)))
                 // Assert: HTTP 400 BAD REQUEST status
@@ -381,6 +392,8 @@ public class PaymentControllerTest {
 
         // Act & Assert: Execute POST request and verify 400 response
         mockMvc.perform(post(PAYMENT_ENDPOINT, TEST_ACCOUNT_ID)
+                        .with(user("testuser").roles("USER"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(paymentRequest)))
                 // Assert: HTTP 400 BAD REQUEST status
@@ -418,6 +431,8 @@ public class PaymentControllerTest {
 
         // Act & Assert: Execute POST request and verify 400 response
         mockMvc.perform(post(PAYMENT_ENDPOINT, TEST_ACCOUNT_ID)
+                        .with(user("testuser").roles("USER"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(paymentRequest)))
                 // Assert: HTTP 400 BAD REQUEST status
@@ -432,12 +447,12 @@ public class PaymentControllerTest {
      * 
      * <p><b>Verification:</b>
      * <ul>
-     *   <li>HTTP status 409 CONFLICT (business rule violation)</li>
+     *   <li>HTTP status 422 UNPROCESSABLE ENTITY (business rule violation)</li>
      *   <li>Error message matches COBOL "You have nothing to pay..." message</li>
      * </ul>
      */
     @Test
-    @DisplayName("Test POST /api/v1/accounts/{accountId}/payments returns 409 CONFLICT for zero balance account")
+    @DisplayName("Test POST /api/v1/accounts/{accountId}/payments returns 422 UNPROCESSABLE ENTITY for zero balance account")
     void testProcessPayment_ZeroBalance() throws Exception {
         // Arrange: Create payment request for account with zero balance
         PaymentRequest paymentRequest = PaymentRequest.builder()
@@ -450,14 +465,19 @@ public class PaymentControllerTest {
         // Arrange: Mock PaymentService to throw InsufficientFundsException
         // Simulates COBOL validation: IF ACCT-CURR-BAL <= ZEROS (line 198)
         when(paymentService.processPayment(any(PaymentRequest.class)))
-                .thenThrow(new InsufficientFundsException("You have nothing to pay..."));
+                .thenThrow(new InsufficientFundsException(
+                        new BigDecimal("100.00"),  // requestedAmount
+                        BigDecimal.ZERO,            // availableBalance (zero balance)
+                        BigDecimal.ZERO));
 
-        // Act & Assert: Execute POST request and verify 409 response
+        // Act & Assert: Execute POST request and verify 422 response
         mockMvc.perform(post(PAYMENT_ENDPOINT, TEST_ACCOUNT_ID)
+                        .with(user("testuser").roles("USER"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(paymentRequest)))
-                // Assert: HTTP 409 CONFLICT status
-                .andExpect(status().isConflict());
+                // Assert: HTTP 422 UNPROCESSABLE ENTITY status
+                .andExpect(status().isUnprocessableEntity());
     }
 
     /**
@@ -491,6 +511,8 @@ public class PaymentControllerTest {
 
         // Act & Assert: Execute POST request and verify 400 response
         mockMvc.perform(post(PAYMENT_ENDPOINT, TEST_ACCOUNT_ID)
+                        .with(user("testuser").roles("USER"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(paymentRequest)))
                 // Assert: HTTP 400 BAD REQUEST status
@@ -524,6 +546,8 @@ public class PaymentControllerTest {
         // Act & Assert: Execute POST request and verify 400 response
         // Bean Validation will fail before service method is called
         mockMvc.perform(post(PAYMENT_ENDPOINT, TEST_ACCOUNT_ID)
+                        .with(user("testuser").roles("USER"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(paymentRequest)))
                 // Assert: HTTP 400 BAD REQUEST status
@@ -560,6 +584,8 @@ public class PaymentControllerTest {
 
         // Act & Assert: Execute POST request and verify 400 response
         mockMvc.perform(post(PAYMENT_ENDPOINT, TEST_ACCOUNT_ID)
+                        .with(user("testuser").roles("USER"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(paymentRequest)))
                 // Assert: HTTP 400 BAD REQUEST status
@@ -602,18 +628,17 @@ public class PaymentControllerTest {
                 .confirmationFlag("Y")
                 .build();
 
-        // Arrange: Create transaction response with parameterized amount
-        TransactionResponse mockResponse = TransactionResponse.builder()
+        // Arrange: Create payment response with parameterized amount
+        PaymentResponse mockResponse = PaymentResponse.builder()
+                .confirmationNumber(UUID.randomUUID().toString())
+                .accountId(TEST_ACCOUNT_ID)
+                .accountNumber(TEST_ACCOUNT_NUMBER)
+                .paymentAmount(paymentAmount)
+                .previousBalance(new BigDecimal("500.00"))
+                .newBalance(new BigDecimal("500.00").subtract(paymentAmount))
+                .paymentDate(LocalDate.now())
                 .transactionId(987654321L)
-                .transactionNumber("0000000987654321")
-                .amount(paymentAmount)
-                .transactionTypeCode("02")
-                .transactionCategoryCode("0002")
-                .transactionSource("POS TERM")
-                .description("BILL PAYMENT - ONLINE")
-                .cardNumberMasked(TEST_CARD_NUMBER_MASKED)
-                .originalTimestamp(LocalDateTime.now())
-                .processingTimestamp(LocalDateTime.now())
+                .message("Payment processed successfully")
                 .build();
 
         // Arrange: Mock PaymentService to return successful payment response
@@ -622,14 +647,16 @@ public class PaymentControllerTest {
 
         // Act & Assert: Execute POST request and verify response
         mockMvc.perform(post(PAYMENT_ENDPOINT, TEST_ACCOUNT_ID)
+                        .with(user("testuser").roles("USER"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(paymentRequest)))
                 // Assert: HTTP 200 OK status
                 .andExpect(status().isOk())
                 // Assert: Payment amount matches expected value with exact precision
-                .andExpect(jsonPath("$.amount").value(new BigDecimal(expectedAmount).doubleValue()))
-                // Assert: Transaction type code is '02' for payment
-                .andExpect(jsonPath("$.transaction_type_code").value("02"));
+                .andExpect(jsonPath("$.paymentAmount").value(new BigDecimal(expectedAmount).doubleValue()))
+                // Assert: Confirmation number exists
+                .andExpect(jsonPath("$.confirmationNumber").exists());
     }
 
     /**
@@ -665,18 +692,17 @@ public class PaymentControllerTest {
                 .confirmationFlag("Y")
                 .build();
 
-        // Arrange: Create transaction response
-        TransactionResponse mockResponse = TransactionResponse.builder()
+        // Arrange: Create payment response
+        PaymentResponse mockResponse = PaymentResponse.builder()
+                .confirmationNumber(UUID.randomUUID().toString())
+                .accountId(TEST_ACCOUNT_ID)
+                .accountNumber(TEST_ACCOUNT_NUMBER)
+                .paymentAmount(TEST_PAYMENT_AMOUNT)
+                .previousBalance(new BigDecimal("500.00"))
+                .newBalance(new BigDecimal("399.50"))
+                .paymentDate(paymentDate)
                 .transactionId(987654321L)
-                .transactionNumber("0000000987654321")
-                .amount(TEST_PAYMENT_AMOUNT)
-                .transactionTypeCode("02")
-                .transactionCategoryCode("0002")
-                .transactionSource("POS TERM")
-                .description("BILL PAYMENT - ONLINE")
-                .cardNumberMasked(TEST_CARD_NUMBER_MASKED)
-                .originalTimestamp(LocalDateTime.now())
-                .processingTimestamp(LocalDateTime.now())
+                .message("Payment processed successfully")
                 .build();
 
         // Arrange: Mock PaymentService to return successful payment response
@@ -685,11 +711,14 @@ public class PaymentControllerTest {
 
         // Act & Assert: Execute POST request and verify response
         mockMvc.perform(post(PAYMENT_ENDPOINT, TEST_ACCOUNT_ID)
+                        .with(user("testuser").roles("USER"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(paymentRequest)))
                 // Assert: HTTP 200 OK status (valid date accepted)
                 .andExpect(status().isOk())
                 // Assert: Payment processed successfully
-                .andExpect(jsonPath("$.transaction_id").value(987654321L));
+                .andExpect(jsonPath("$.confirmationNumber").exists())
+                .andExpect(jsonPath("$.transactionId").value(987654321L));
     }
 }
