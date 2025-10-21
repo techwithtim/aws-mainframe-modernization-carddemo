@@ -1,0 +1,108 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: carddemo-config
+  namespace: carddemo
+data:
+  SPRING_PROFILES_ACTIVE: "prod"
+  DB_URL: "jdbc:postgresql://postgres:5432/carddemo"
+  DB_USER: "carddemo"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: carddemo-secret
+  namespace: carddemo
+type: Opaque
+stringData:
+  DB_PASS: "carddemo"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: carddemo-app
+  namespace: carddemo
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: carddemo-app
+  template:
+    metadata:
+      labels:
+        app: carddemo-app
+    spec:
+      containers:
+      - name: carddemo-app
+        image: carddemo:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+        envFrom:
+        - configMapRef:
+            name: carddemo-config
+        - secretRef:
+            name: carddemo-secret
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8080
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: carddemo-service
+  namespace: carddemo
+spec:
+  selector:
+    app: carddemo-app
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8080
+  type: LoadBalancer
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: carddemo-hpa
+  namespace: carddemo
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: carddemo-app
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80

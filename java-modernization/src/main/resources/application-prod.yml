@@ -1,0 +1,10 @@
+spring:
+  jpa:
+    show-sql: false
+  
+logging:
+  level:
+    root: INFO
+    com.aws.carddemo: INFO
+    org.springframework.web: WARN
+    org.hibernate.SQL: WARN

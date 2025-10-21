@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: carddemo-postgres
+    environment:
+      POSTGRES_DB: carddemo
+      POSTGRES_USER: carddemo
+      POSTGRES_PASSWORD: carddemo
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U carddemo"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - carddemo-network
+
+  carddemo-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: carddemo-app
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      DB_URL: jdbc:postgresql://postgres:5432/carddemo
+      DB_USER: carddemo
+      DB_PASS: carddemo
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - carddemo-network
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+
+networks:
+  carddemo-network:
+    driver: bridge
