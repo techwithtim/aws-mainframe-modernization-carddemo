@@ -23,8 +23,11 @@ CardDemo is a credit card management system that has been modernized from a COBO
 
 - **Account Management**: Create, read, update, and delete credit card accounts
 - **Card Management**: Manage credit cards associated with accounts
-- **Transaction Processing**: Record and query credit card transactions
+- **Transaction Processing**: Record and query credit card transactions with automatic balance updates
 - **Customer Management**: Store and retrieve customer information
+- **User Management**: Admin and regular user account management
+- **Authentication**: Secure login and user validation
+- **Bill Payment**: Pay account balances in full with automatic transaction creation
 - **RESTful API**: Modern REST endpoints for all operations
 - **Cloud-Ready**: Containerized and Kubernetes-ready deployment
 
@@ -148,9 +151,44 @@ This will start:
 | GET | `/api/v1/transactions/{id}` | Get transaction by ID |
 | GET | `/api/v1/transactions?cardNumber={num}` | Get transactions by card |
 | GET | `/api/v1/transactions?cardNumber={num}&startDate={date}&endDate={date}` | Get transactions by date range |
-| POST | `/api/v1/transactions` | Create new transaction |
+| POST | `/api/v1/transactions` | Create new transaction (auto-updates account balance) |
 | PUT | `/api/v1/transactions/{id}` | Update transaction |
 | DELETE | `/api/v1/transactions/{id}` | Delete transaction |
+
+### Customers API
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/customers` | Get all customers |
+| GET | `/api/v1/customers/{id}` | Get customer by ID |
+| POST | `/api/v1/customers` | Create new customer |
+| PUT | `/api/v1/customers/{id}` | Update customer |
+| DELETE | `/api/v1/customers/{id}` | Delete customer |
+
+### Users API
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/users` | Get all users |
+| GET | `/api/v1/users/{userId}` | Get user by ID |
+| GET | `/api/v1/users/type/{userType}` | Get users by type (A=Admin, R=Regular) |
+| POST | `/api/v1/users` | Create new user |
+| PUT | `/api/v1/users/{userId}` | Update user |
+| PUT | `/api/v1/users/{userId}/password` | Update user password |
+| DELETE | `/api/v1/users/{userId}` | Delete user |
+
+### Authentication API
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v1/auth/login` | Authenticate user (returns user info and token) |
+| POST | `/api/v1/auth/validate` | Validate user credentials |
+
+### Bill Payment API
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v1/billpayment` | Pay account balance in full |
 
 ### Example API Calls
 
@@ -310,7 +348,12 @@ For detailed information about how COBOL programs were mapped to Java classes, s
 | COACTUPC | AccountService | Account updates |
 | COCRDLIC | CardController | Card listing |
 | COCRDUPC | CardService | Card updates |
-| COTRN02C | TransactionService | Transaction creation |
+| COTRN02C | TransactionService | Transaction creation with balance updates |
+| COSGN00C | AuthenticationController | User sign-on and authentication |
+| COUSR00C-03C | UserController | User management (list, create, update, delete) |
+| COBIL00C | BillPaymentController | Bill payment processing |
+| CBCUS01C | CustomerController | Customer management |
+| CXACAIX (file) | CardXref entity | Card-account-customer cross-reference |
 
 ## Contributing
 
