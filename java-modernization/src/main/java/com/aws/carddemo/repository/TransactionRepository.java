@@ -31,4 +31,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
     List<Transaction> findByTransactionCategoryCode(@Param("categoryCode") Integer categoryCode);
 
     boolean existsByTransactionId(String transactionId);
+    
+    Transaction findTopByOrderByTransactionIdDesc();
 }
