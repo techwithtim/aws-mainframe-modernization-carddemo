@@ -1,6 +1,8 @@
 package com.aws.carddemo.controller;
 
 import com.aws.carddemo.dto.TransactionDTO;
+import com.aws.carddemo.dto.TransactionListRequest;
+import com.aws.carddemo.dto.TransactionListResponse;
 import com.aws.carddemo.service.TransactionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -68,5 +70,12 @@ public class TransactionController {
         log.info("DELETE /api/v1/transactions/{}", id);
         transactionService.deleteTransaction(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/search")
+    public ResponseEntity<TransactionListResponse> searchTransactions(@RequestBody TransactionListRequest request) {
+        log.info("POST /api/v1/transactions/search");
+        TransactionListResponse response = transactionService.searchTransactions(request);
+        return ResponseEntity.ok(response);
     }
 }

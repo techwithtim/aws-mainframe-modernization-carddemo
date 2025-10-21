@@ -1,11 +1,15 @@
 package com.aws.carddemo.service;
 
 import com.aws.carddemo.dto.TransactionDTO;
+import com.aws.carddemo.dto.TransactionListRequest;
+import com.aws.carddemo.dto.TransactionListResponse;
 import com.aws.carddemo.exception.ResourceNotFoundException;
 import com.aws.carddemo.model.Account;
+import com.aws.carddemo.model.Card;
 import com.aws.carddemo.model.CardXref;
 import com.aws.carddemo.model.Transaction;
 import com.aws.carddemo.repository.AccountRepository;
+import com.aws.carddemo.repository.CardRepository;
 import com.aws.carddemo.repository.CardXrefRepository;
 import com.aws.carddemo.repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -29,6 +34,7 @@ public class TransactionService {
     private final TransactionRepository transactionRepository;
     private final AccountRepository accountRepository;
     private final CardXrefRepository cardXrefRepository;
+    private final CardRepository cardRepository;
 
     public TransactionDTO getTransactionById(String transactionId) {
         log.info("Fetching transaction with ID: {}", transactionId);
@@ -139,6 +145,78 @@ public class TransactionService {
             throw new ResourceNotFoundException("Transaction not found with ID: " + transactionId);
         }
         transactionRepository.deleteById(transactionId);
+    }
+
+    public TransactionListResponse searchTransactions(TransactionListRequest request) {
+        log.info("Searching transactions with filters");
+        List<Transaction> allTransactions = transactionRepository.findAll();
+        List<Transaction> filteredTransactions = new ArrayList<>();
+
+        for (Transaction transaction : allTransactions) {
+            if (matchesFilters(transaction, request)) {
+                filteredTransactions.add(transaction);
+            }
+        }
+
+        int totalCount = filteredTransactions.size();
+        int pageNumber = request.getPageNumber();
+        int pageSize = request.getPageSize();
+        int startIndex = pageNumber * pageSize;
+        int endIndex = Math.min(startIndex + pageSize, totalCount);
+
+        List<Transaction> pagedTransactions = filteredTransactions.subList(
+            Math.min(startIndex, totalCount), 
+            Math.min(endIndex, totalCount)
+        );
+
+        List<TransactionDTO> dtos = pagedTransactions.stream()
+            .map(this::mapToDTO)
+            .collect(Collectors.toList());
+
+        return new TransactionListResponse(dtos, totalCount, pageNumber, pageSize);
+    }
+
+    private boolean matchesFilters(Transaction transaction, TransactionListRequest request) {
+        if (request.getCardNumber() != null && !request.getCardNumber().isEmpty()) {
+            if (!request.getCardNumber().equals(transaction.getCardNumber())) {
+                return false;
+            }
+        }
+
+        if (request.getAccountId() != null && !request.getAccountId().isEmpty()) {
+            Optional<CardXref> xrefOpt = cardXrefRepository.findByCardNum(transaction.getCardNumber());
+            if (xrefOpt.isEmpty() || !request.getAccountId().equals(xrefOpt.get().getAcctId())) {
+                return false;
+            }
+        }
+
+        if (request.getStartDate() != null) {
+            if (transaction.getProcessTimestamp() == null || 
+                transaction.getProcessTimestamp().isBefore(request.getStartDate())) {
+                return false;
+            }
+        }
+
+        if (request.getEndDate() != null) {
+            if (transaction.getProcessTimestamp() == null || 
+                transaction.getProcessTimestamp().isAfter(request.getEndDate())) {
+                return false;
+            }
+        }
+
+        if (request.getTransactionTypeCode() != null && !request.getTransactionTypeCode().isEmpty()) {
+            if (!request.getTransactionTypeCode().equals(transaction.getTransactionTypeCode())) {
+                return false;
+            }
+        }
+
+        if (request.getTransactionCategoryCode() != null) {
+            if (!request.getTransactionCategoryCode().equals(transaction.getTransactionCategoryCode())) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private String generateTransactionId() {

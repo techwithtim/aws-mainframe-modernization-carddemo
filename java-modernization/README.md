@@ -25,9 +25,15 @@ CardDemo is a credit card management system that has been modernized from a COBO
 - **Card Management**: Manage credit cards associated with accounts
 - **Transaction Processing**: Record and query credit card transactions with automatic balance updates
 - **Customer Management**: Store and retrieve customer information
-- **User Management**: Admin and regular user account management
+- **User Management**: Admin and regular user account management with role-based access
 - **Authentication**: Secure login and user validation
 - **Bill Payment**: Pay account balances in full with automatic transaction creation
+- **Card Selection**: Query cards by account or customer with cross-reference support
+- **Menu Navigation**: Dynamic menu generation based on user roles
+- **Batch Processing**: Daily account processing, interest calculation, cycle resets, and transaction posting
+- **Report Generation**: Account summaries, transaction reports, card utilization, and monthly statements
+- **Advanced Search**: Transaction filtering with pagination, date ranges, types, and categories
+- **Utility Services**: Date conversion, validation, and formatting utilities
 - **RESTful API**: Modern REST endpoints for all operations
 - **Cloud-Ready**: Containerized and Kubernetes-ready deployment
 
@@ -152,6 +158,7 @@ This will start:
 | GET | `/api/v1/transactions?cardNumber={num}` | Get transactions by card |
 | GET | `/api/v1/transactions?cardNumber={num}&startDate={date}&endDate={date}` | Get transactions by date range |
 | POST | `/api/v1/transactions` | Create new transaction (auto-updates account balance) |
+| POST | `/api/v1/transactions/search` | Search transactions with advanced filters (pagination, type, category) |
 | PUT | `/api/v1/transactions/{id}` | Update transaction |
 | DELETE | `/api/v1/transactions/{id}` | Delete transaction |
 
@@ -189,6 +196,43 @@ This will start:
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/api/v1/billpayment` | Pay account balance in full |
+
+### Card Selection API
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/card-selection/by-account/{accountId}` | Get all cards for an account |
+| GET | `/api/v1/card-selection/by-customer/{customerId}` | Get all cards for a customer |
+| POST | `/api/v1/card-selection/select` | Select cards by account or customer ID |
+
+### Menu API
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/menu/main?userId={userId}` | Get main menu for user |
+| GET | `/api/v1/menu/admin?userId={userId}` | Get admin menu (admin users only) |
+| GET | `/api/v1/menu/transaction?userId={userId}` | Get transaction menu |
+
+### Batch Operations API
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v1/batch/accounts/process` | Process all accounts (batch job) |
+| POST | `/api/v1/batch/accounts/calculate-interest` | Calculate interest for all accounts |
+| POST | `/api/v1/batch/accounts/reset-cycles` | Reset cycle counters for all accounts |
+| POST | `/api/v1/batch/accounts/close-expired` | Close expired accounts |
+| POST | `/api/v1/batch/transactions/post-daily` | Post daily transactions |
+| POST | `/api/v1/batch/transactions/purge?daysToKeep={days}` | Purge old transactions |
+| GET | `/api/v1/batch/transactions/summary` | Generate transaction summary |
+
+### Reports API
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/reports/accounts/summary` | Generate account summary report |
+| GET | `/api/v1/reports/transactions?startDate={date}&endDate={date}` | Generate transaction report for date range |
+| GET | `/api/v1/reports/cards/utilization` | Generate card utilization report |
+| GET | `/api/v1/reports/statements/{accountId}` | Generate monthly statement for account |
 
 ### Example API Calls
 
@@ -348,11 +392,20 @@ For detailed information about how COBOL programs were mapped to Java classes, s
 | COACTUPC | AccountService | Account updates |
 | COCRDLIC | CardController | Card listing |
 | COCRDUPC | CardService | Card updates |
+| COCRDSLC | CardSelectionController | Card selection by account/customer |
+| COTRN00C | TransactionController | Transaction listing and viewing |
+| COTRN01C | TransactionService.searchTransactions | Advanced transaction search |
 | COTRN02C | TransactionService | Transaction creation with balance updates |
 | COSGN00C | AuthenticationController | User sign-on and authentication |
 | COUSR00C-03C | UserController | User management (list, create, update, delete) |
 | COBIL00C | BillPaymentController | Bill payment processing |
 | CBCUS01C | CustomerController | Customer management |
+| CBACT01C-04C | BatchAccountService | Batch account processing, interest calculation, cycle resets |
+| CBTRN01C-03C | BatchTransactionService | Daily transaction posting, purging, summaries |
+| CORPT00C | ReportService | Report generation (accounts, transactions, utilization, statements) |
+| COADM01C | MenuService.getAdminMenu | Admin menu navigation |
+| COMEN01C | MenuService.getMainMenu | Main menu navigation |
+| CSUTLDTC | UtilityService | Date conversion and utility functions |
 | CXACAIX (file) | CardXref entity | Card-account-customer cross-reference |
 
 ## Contributing
